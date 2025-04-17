@@ -10,9 +10,10 @@ struct Node {
     double x, y;  // 2D position
     int parent;   // Index of parent node in the nodes vector
     double time;  // Time when node was added (for visualization)
+    double cost;   // Cost from start to this node (RRT* specific)
 
-    Node(double x, double y, int parent = -1, double time = 0.0) 
-        : x(x), y(y), parent(parent), time(time) {}
+    Node(double x, double y, int parent = -1, double time = 0.0, double cost = 0.0) 
+        : x(x), y(y), parent(parent), time(time), cost(cost) {}
 };
 
 // Calculate Euclidean distance between two nodes

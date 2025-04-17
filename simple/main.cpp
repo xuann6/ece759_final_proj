@@ -1,4 +1,5 @@
 #include "rrt.h"
+#include "rrtStar.h"
 #include <iostream>
 #include <chrono>
 
@@ -8,13 +9,16 @@ int main() {
     
     // Example usage
     Node start(0.1, 0.1);
-    Node goal(0.9, 0.9);
+    Node goal(15.9, 15.9);
     
     std::cout << "Running RRT from (" << start.x << ", " << start.y << ") to (" 
               << goal.x << ", " << goal.y << ")" << std::endl;
     
     std::cout << "Visualization is " << (enableVisualization ? "enabled" : "disabled") << std::endl;
     
+    // ===================== RRT Test =====================
+    std::cout << "\n======== Standard RRT ========" << std::endl;
+
     // Start timer
     auto startTime = std::chrono::high_resolution_clock::now();
     
@@ -28,24 +32,55 @@ int main() {
     // xMin, xMax, yMin, yMax: Bounds of the environment
     // treeFilename: File name to save the tree data for visualization
     // enableVisualization: Flag to enable or disable visualization
-    std::vector<Node> path = buildRRT(
+    std::vector<Node> pathRRT = buildRRT(
         start, goal, 0.1, 0.1, 5000, 0.0, 1.0, 0.0, 1.0, "rrt_tree.csv", enableVisualization
     );
     
     // End timer
     auto endTime = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = endTime - startTime;
+    std::chrono::duration<double> elapsedRRT = endTime - startTime;
     
-    if (!path.empty()) {
-        std::cout << "Path found with " << path.size() << " nodes in " 
-                  << elapsed.count() << " seconds:" << std::endl;
+    if (!pathRRT.empty()) {
+        std::cout << "RRT path found with " << pathRRT.size() << " nodes in "
+                << elapsedRRT.count() << " seconds" << std::endl;
         
-        for (const auto& node : path) {
-            std::cout << "(" << node.x << ", " << node.y << ")" << std::endl;
+        // Calculate path length
+        double pathLengthRRT = 0.0;
+        for (int i = 1; i < pathRRT.size(); i++) {
+            pathLengthRRT += distance(pathRRT[i-1], pathRRT[i]);
         }
+        std::cout << "RRT path length: " << pathLengthRRT << std::endl;
+    } else {
+        std::cout << "RRT failed to find a path" << std::endl;
     }
-    
-    std::cout << "Total execution time: " << elapsed.count() << " seconds" << std::endl;
         
+    // ===================== RRT* Test =====================
+    std::cout << "\n======== RRT* ========" << std::endl;
+    
+    auto startTimeRRTStar = std::chrono::high_resolution_clock::now();
+    std::vector<std::vector<double>> obstacles;
+    
+    // Run RRT*
+    std::vector<Node> pathRRTStar = rrt_star::buildRRTStar(
+        start, goal, obstacles, 0.1, 0.1, 5000, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_star_tree.csv", enableVisualization
+    );
+    
+    auto endTimeRRTStar = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsedRRTStar = endTimeRRTStar - startTimeRRTStar;
+    
+    if (!pathRRTStar.empty()) {
+        std::cout << "RRT* path found with " << pathRRTStar.size() << " nodes in "
+                << elapsedRRTStar.count() << " seconds" << std::endl;
+        
+        // Calculate path length
+        double pathLengthRRTStar = 0.0;
+        for (int i = 1; i < pathRRTStar.size(); i++) {
+            pathLengthRRTStar += distance(pathRRTStar[i-1], pathRRTStar[i]);
+        }
+        std::cout << "RRT* path length: " << pathLengthRRTStar << std::endl;
+    } else {
+        std::cout << "RRT* failed to find a path" << std::endl;
+    }
+
     return 0;
 }
