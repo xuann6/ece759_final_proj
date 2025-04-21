@@ -227,50 +227,61 @@ std::vector<Node> buildRRTStar(
                     // Check if path to goal is collision-free
                     if (isPathClear(newNode, goal, obstacles)) {
                         
-                        // Todo: this is one of the option, need further discussion here
-                        // double totalCost = newNode.cost + distToGoal;
+                        /*
+                         * Todo (Option 1)
+                         *   This is one of the option, which we search for the best
+                         *   path til the max iteration is reached. 
+                         */ 
                         
-                        // // If this path is better than previous solutions
-                        // if (totalCost < bestCost) {
-                        //     bestCost = totalCost;
+                        double totalCost = newNode.cost + distToGoal;
+                        
+                        // If this path is better than previous solutions
+                        if (totalCost < bestCost) {
+                            bestCost = totalCost;
                             
-                        //     // Create goal node
-                        //     Node goalNode = goal;
-                        //     goalNode.parent = newNodeIndex;
-                        //     goalNode.cost = totalCost;
+                            // Create goal node
+                            Node goalNode = goal;
+                            goalNode.parent = newNodeIndex;
+                            goalNode.cost = totalCost;
                             
-                        //     // Set time for goal node
-                        //     auto goalTime = std::chrono::high_resolution_clock::now();
-                        //     std::chrono::duration<double> goalElapsed = goalTime - startTime;
-                        //     goalNode.time = goalElapsed.count();
+                            // Set time for goal node
+                            auto goalTime = std::chrono::high_resolution_clock::now();
+                            std::chrono::duration<double> goalElapsed = goalTime - startTime;
+                            goalNode.time = goalElapsed.count();
                             
-                        //     // Add or update goal node
-                        //     if (goalNodeIndex == -1) {
-                        //         nodes.push_back(goalNode);
-                        //         goalNodeIndex = nodes.size() - 1;
-                        //     } else {
-                        //         // Replace existing goal node with better path
-                        //         nodes[goalNodeIndex] = goalNode;
-                        //     }
-                        // }
-
-                        Node goalNode = goal;
-                        goalNode.parent = newNodeIndex;
-                        
-                        // Set time for goal node
-                        auto goalTime = std::chrono::high_resolution_clock::now();
-                        std::chrono::duration<double> goalElapsed = goalTime - startTime;
-                        goalNode.time = goalElapsed.count();
-                        
-                        nodes.push_back(goalNode);
-                        
-                        // Save the tree data if visualization is enabled
-                        if (enableVisualization) {
-                            saveTreeToFile(nodes, treeFilename);
+                            // Add or update goal node
+                            if (goalNodeIndex == -1) {
+                                nodes.push_back(goalNode);
+                                goalNodeIndex = nodes.size() - 1;
+                            } else {
+                                // Replace existing goal node with better path
+                                nodes[goalNodeIndex] = goalNode;
+                            }
                         }
+
+                        /*
+                         * Todo (Option 2)
+                         *   This is the other option, which ends our search 
+                         *   once it reaches the goal.
+                         */ 
+
+                        // Node goalNode = goal;
+                        // goalNode.parent = newNodeIndex;
                         
-                        // Extract and return path
-                        return extractPath(nodes, nodes.size() - 1);
+                        // // Set time for goal node
+                        // auto goalTime = std::chrono::high_resolution_clock::now();
+                        // std::chrono::duration<double> goalElapsed = goalTime - startTime;
+                        // goalNode.time = goalElapsed.count();
+                        
+                        // nodes.push_back(goalNode);
+                        
+                        // // Save the tree data if visualization is enabled
+                        // if (enableVisualization) {
+                        //     saveTreeToFile(nodes, treeFilename);
+                        // }
+                        
+                        // // Extract and return path
+                        // return extractPath(nodes, nodes.size() - 1);
         
                     }
                 }
