@@ -1,6 +1,7 @@
 #include "rrt.h"
 #include "rrtStar.h"
 #include "rrtInformed.h"
+#include "rrtBidirectional.h"
 #include <iostream>
 #include <chrono>
 
@@ -108,6 +109,44 @@ int main() {
         std::cout << "Informed RRT* path length: " << pathLengthInformedRRTStar << std::endl;
     } else {
         std::cout << "Informed RRT* failed to find a path" << std::endl;
+    }
+
+    // ===================== RRT Bidirectional Test =====================
+    std::cout << "\n======== Bidirectional RRT ========" << std::endl;
+
+    // Start timer
+    auto bidirectionalRRTStartTime = std::chrono::high_resolution_clock::now();
+    
+    // Run RRT-Bi
+    // Parameters:
+    // start: Starting node of the RRT
+    // goal: Goal node of the RRT
+    // stepSize: Maximum distance between two nodes in the tree
+    // goalThreshold: Distance threshold to consider the goal reached
+    // maxIterations: Maximum number of iterations to run the RRT
+    // xMin, xMax, yMin, yMax: Bounds of the environment
+    // treeFilename: File name to save the tree data for visualization
+    // enableVisualization: Flag to enable or disable visualization
+    std::vector<Node> pathBidirectionalRRT = bidirectional_rrt::buildBidirectionalRRT(
+        start, goal, obstacles,  0.1, 0.1, 10000, 0.0, 1.0, 0.0, 1.0, "rrt_bidirectional_tree.csv", enableVisualization
+    );
+    
+    // End timer
+    auto bidirectionalRRTEndTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsedBidirectionalRRT = bidirectionalRRTEndTime - bidirectionalRRTStartTime;
+    
+    if (!pathBidirectionalRRT.empty()) {
+        std::cout << "RRT bidirectional path found with " << pathBidirectionalRRT.size() << " nodes in "
+                << elapsedBidirectionalRRT.count() << " seconds" << std::endl;
+        
+        // Calculate path length
+        double pathLengthRRTBi = 0.0;
+        for (int i = 1; i < pathRRT.size(); i++) {
+            pathLengthRRTBi += distance(pathBidirectionalRRT[i-1], pathBidirectionalRRT[i]);
+        }
+        std::cout << "RRT path length: " << pathLengthRRTBi << std::endl;
+    } else {
+        std::cout << "RRT failed to find a path" << std::endl;
     }
     
     return 0;
