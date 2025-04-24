@@ -96,130 +96,144 @@ namespace rrt_informed {
         }
     }
     
-    // Main Informed RRT* algorithm
-    std::vector<Node> buildInformedRRTStar(
-        const Node& start,
-        const Node& goal,
-        const std::vector<std::vector<double>>& obstacles,
-        double stepSize,
-        double goalThreshold,
-        int maxIterations,
-        double rewireRadius,
-        double xMin,
-        double xMax,
-        double yMin,
-        double yMax,
-        const std::string& treeFilename,
-        bool enableVisualization
-    ) {
-        // Start timing
-        std::chrono::time_point<std::chrono::high_resolution_clock> startTime = 
-            std::chrono::high_resolution_clock::now();
+// Main Informed RRT* algorithm with option to stop at first solution
+std::vector<Node> buildInformedRRTStar(
+    const Node& start,
+    const Node& goal,
+    const std::vector<std::vector<double>>& obstacles,
+    double stepSize,
+    double goalThreshold,
+    int maxIterations,
+    double rewireRadius,
+    double xMin,
+    double xMax,
+    double yMin,
+    double yMax,
+    const std::string& treeFilename,
+    bool enableVisualization,
+    bool stopAtFirstSolution  // New parameter
+) {
+    // Start timing
+    std::chrono::time_point<std::chrono::high_resolution_clock> startTime = 
+        std::chrono::high_resolution_clock::now();
+    
+    // Initialize tree with start node (cost = 0)
+    std::vector<Node> nodes;
+    nodes.push_back(Node(start.x, start.y, -1, 0.0, 0.0)); // Start node at time 0, cost 0
+    
+    // Best solution found so far
+    double bestCost = std::numeric_limits<double>::infinity();
+    int goalNodeIndex = -1;
+    
+    // Main loop
+    for (int i = 0; i < maxIterations; i++) {
+        // Get current time for this iteration
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = currentTime - startTime;
+        double timeSeconds = elapsed.count();
         
-        // Initialize tree with start node (cost = 0)
-        std::vector<Node> nodes;
-        nodes.push_back(Node(start.x, start.y, -1, 0.0, 0.0)); // Start node at time 0, cost 0
+        // Sample from the informed subset (ellipsoid) if we have a solution
+        Node randomNode = sampleInformedSubset(start, goal, bestCost, xMin, xMax, yMin, yMax);
         
-        // Best solution found so far
-        double bestCost = std::numeric_limits<double>::infinity();
-        int goalNodeIndex = -1;
+        // Find nearest node
+        int nearestIndex = findNearest(nodes, randomNode);
         
-        // Main loop
-        for (int i = 0; i < maxIterations; i++) {
-            // Get current time for this iteration
-            auto currentTime = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = currentTime - startTime;
-            double timeSeconds = elapsed.count();
+        // Create new node by steering
+        Node newNode = steer(nodes[nearestIndex], randomNode, stepSize);
+        newNode.time = timeSeconds;
+        
+        // Check if path to new node is collision-free
+        if (rrt_star::isPathClear(nodes[nearestIndex], newNode, obstacles)) {
+            // Find nodes within the rewiring radius
+            std::vector<int> nearIndices = rrt_star::findNearNodes(nodes, newNode, rewireRadius);
             
-            // Sample from the informed subset (ellipsoid) if we have a solution
-            Node randomNode = sampleInformedSubset(start, goal, bestCost, xMin, xMax, yMin, yMax);
+            // Choose best parent
+            int bestParentIndex = rrt_star::chooseBestParent(nodes, newNode, nearIndices, obstacles);
             
-            // Find nearest node
-            int nearestIndex = findNearest(nodes, randomNode);
-            
-            // Create new node by steering
-            Node newNode = steer(nodes[nearestIndex], randomNode, stepSize);
-            newNode.time = timeSeconds;
-            
-            // Check if path to new node is collision-free
-            if (rrt_star::isPathClear(nodes[nearestIndex], newNode, obstacles)) {
-                // Find nodes within the rewiring radius
-                std::vector<int> nearIndices = rrt_star::findNearNodes(nodes, newNode, rewireRadius);
+            if (bestParentIndex != -1) {
+                // Set parent and cost for the new node
+                newNode.parent = bestParentIndex;
+                newNode.cost = nodes[bestParentIndex].cost + distance(nodes[bestParentIndex], newNode);
                 
-                // Choose best parent
-                int bestParentIndex = rrt_star::chooseBestParent(nodes, newNode, nearIndices, obstacles);
+                // Add new node to tree
+                nodes.push_back(newNode);
+                int newNodeIndex = nodes.size() - 1;
                 
-                if (bestParentIndex != -1) {
-                    // Set parent and cost for the new node
-                    newNode.parent = bestParentIndex;
-                    newNode.cost = nodes[bestParentIndex].cost + distance(nodes[bestParentIndex], newNode);
-                    
-                    // Add new node to tree
-                    nodes.push_back(newNode);
-                    int newNodeIndex = nodes.size() - 1;
-                    
-                    // Rewire the tree
-                    rrt_star::rewireTree(nodes, newNodeIndex, nearIndices, obstacles);
-                    
-                    // Check if we can reach the goal from this new node
-                    double distToGoal = distance(newNode, goal);
-                    if (distToGoal <= goalThreshold) {
-                        // Check if path to goal is collision-free
-                        if (rrt_star::isPathClear(newNode, goal, obstacles)) {
-                            // Calculate total cost to goal
-                            double totalCost = newNode.cost + distToGoal;
+                // Rewire the tree
+                rrt_star::rewireTree(nodes, newNodeIndex, nearIndices, obstacles);
+                
+                // Check if we can reach the goal from this new node
+                double distToGoal = distance(newNode, goal);
+                if (distToGoal <= goalThreshold) {
+                    // Check if path to goal is collision-free
+                    if (rrt_star::isPathClear(newNode, goal, obstacles)) {
+                        // Calculate total cost to goal
+                        double totalCost = newNode.cost + distToGoal;
+                        
+                        // If this path is better than previous solutions
+                        if (totalCost < bestCost) {
+                            bestCost = totalCost;
                             
-                            // If this path is better than previous solutions
-                            if (totalCost < bestCost) {
-                                bestCost = totalCost;
+                            // Create goal node
+                            Node goalNode = goal;
+                            goalNode.parent = newNodeIndex;
+                            goalNode.cost = totalCost;
+                            
+                            // Set time for goal node
+                            auto goalTime = std::chrono::high_resolution_clock::now();
+                            std::chrono::duration<double> goalElapsed = goalTime - startTime;
+                            goalNode.time = goalElapsed.count();
+                            
+                            // Add or update goal node
+                            if (goalNodeIndex == -1) {
+                                nodes.push_back(goalNode);
+                                goalNodeIndex = nodes.size() - 1;
                                 
-                                // Create goal node
-                                Node goalNode = goal;
-                                goalNode.parent = newNodeIndex;
-                                goalNode.cost = totalCost;
-                                
-                                // Set time for goal node
-                                auto goalTime = std::chrono::high_resolution_clock::now();
-                                std::chrono::duration<double> goalElapsed = goalTime - startTime;
-                                goalNode.time = goalElapsed.count();
-                                
-                                // Add or update goal node
-                                if (goalNodeIndex == -1) {
-                                    nodes.push_back(goalNode);
-                                    goalNodeIndex = nodes.size() - 1;
-                                } else {
-                                    // Replace existing goal node with better path
-                                    nodes[goalNodeIndex] = goalNode;
+                                // Option 2: If we want to stop at first solution
+                                if (stopAtFirstSolution) {
+                                    // Save the tree data if visualization is enabled
+                                    if (enableVisualization) {
+                                        saveTreeToFile(nodes, treeFilename);
+                                    }
+                                    
+                                    std::cout << "Goal reached in " << i << " iterations. Stopping search." << std::endl;
+                                    
+                                    // Extract and return path
+                                    return extractPath(nodes, nodes.size() - 1);
                                 }
-                                
-                                // Log the improved solution
-                                std::cout << "Improved solution found at iteration " << i 
-                                          << " with cost: " << bestCost << std::endl;
+                            } else {
+                                // Replace existing goal node with better path
+                                nodes[goalNodeIndex] = goalNode;
                             }
+                            
+                            // Log the improved solution
+                            //std::cout << "Improved solution found at iteration " << i 
+                            //          << " with cost: " << bestCost << std::endl;
                         }
                     }
                 }
             }
-            
-            // Periodically save the tree for visualization
-            if (enableVisualization && i % 100 == 0) {
-                saveTreeToFile(nodes, treeFilename);
-            }
         }
         
-        // Save the final tree data if visualization is enabled
-        if (enableVisualization) {
+        // Periodically save the tree for visualization
+        if (enableVisualization && i % 100 == 0) {
             saveTreeToFile(nodes, treeFilename);
         }
-        
-        // If goal was reached, extract and return the path
-        if (goalNodeIndex != -1) {
-            return extractPath(nodes, goalNodeIndex);
-        } else {
-            // If goal not reached, return empty path
-            std::cout << "Goal not reached within max iterations." << std::endl;
-            return std::vector<Node>();
-        }
     }
+    
+    // Save the final tree data if visualization is enabled
+    if (enableVisualization) {
+        saveTreeToFile(nodes, treeFilename);
+    }
+    
+    // If goal was reached, extract and return the path
+    if (goalNodeIndex != -1) {
+        return extractPath(nodes, goalNodeIndex);
+    } else {
+        // If goal not reached, return empty path
+        std::cout << "Goal not reached within max iterations." << std::endl;
+        return std::vector<Node>();
+    }
+}
 
 } // end of namespace

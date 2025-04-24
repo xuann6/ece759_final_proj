@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <fstream>
 #include <chrono>
+#include <queue>
 
 namespace rrt_star {
     // Find nodes within a certain radius
@@ -24,7 +25,8 @@ namespace rrt_star {
     // Check if the path between two nodes is collision-free
     bool isPathClear(const Node& from, const Node& to, const std::vector<std::vector<double>>& obstacles) {
         // For each obstacle (represented as [x, y, radius])
-        
+        //std::cout << "Entered isPathClear." << std::endl;
+
         if (obstacles.empty()) {
             return true;  // No obstacles, for the easiest case
         }
@@ -76,10 +78,12 @@ namespace rrt_star {
             );
             
             if (distToObstacle <= radius) {
+                //std::cout << "Left isPathClear." << std::endl;
                 return false; // Collision detected
             }
         }
-        
+
+        //std::cout << "Left isPathClear." << std::endl;
         return true; // No collision
     }
 
@@ -87,6 +91,9 @@ namespace rrt_star {
     int chooseBestParent(const std::vector<Node>& nodes, const Node& newNode, 
                         const std::vector<int>& nearIndices, 
                         const std::vector<std::vector<double>>& obstacles) {
+        
+        //std::cout << "Entered chooseBestParent." << std::endl;
+        
         int bestParentIndex = -1;
         double bestCost = std::numeric_limits<double>::infinity();
         
@@ -104,53 +111,110 @@ namespace rrt_star {
             }
         }
         
+        //std::cout << "Left chooseBestParent." << std::endl;
+        
         return bestParentIndex;
     }
 
-    // Rewire the tree to optimize paths (RRT* specific)
-    void rewireTree(std::vector<Node>& nodes, int newNodeIdx, 
-                const std::vector<int>& nearIndices,
-                const std::vector<std::vector<double>>& obstacles) {
-        const Node& newNode = nodes[newNodeIdx];
-        
-        for (int nearIdx : nearIndices) {
-            // Skip the parent of the new node
-            if (nearIdx == nodes[newNodeIdx].parent) {
-                continue;
-            }
-            
-            // Check if the path is collision-free
-            if (isPathClear(newNode, nodes[nearIdx], obstacles)) {
-                // Calculate cost through the new node
-                double costThroughNew = newNode.cost + distance(newNode, nodes[nearIdx]);
-                
-                // Rewire if the cost is lower
-                if (costThroughNew < nodes[nearIdx].cost) {
-                    nodes[nearIdx].parent = newNodeIdx;
-                    nodes[nearIdx].cost = costThroughNew;
-                    
-                    // Propagate cost changes to descendants (recursive approach)
-                    // In a production system, you might use a more efficient approach
-                    for (int i = 0; i < nodes.size(); i++) {
-                        if (nodes[i].parent == nearIdx) {
-                            // Update cost
-                            double oldCost = nodes[i].cost;
-                            nodes[i].cost = nodes[nearIdx].cost + distance(nodes[nearIdx], nodes[i]);
-                            
-                            // If cost changed, check descendants of this node too
-                            if (nodes[i].cost != oldCost) {
-                                std::vector<int> childIndices = {i};
-                                rewireTree(nodes, i, childIndices, obstacles);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+// Rewire the tree to optimize paths (RRT* specific) - non-recursive version
+void rewireTree(std::vector<Node>& nodes, int newNodeIdx, 
+    const std::vector<int>& nearIndices,
+    const std::vector<std::vector<double>>& obstacles) {
+const Node& newNode = nodes[newNodeIdx];
+
+// First pass: directly rewire neighbors of the new node
+for (int nearIdx : nearIndices) {
+
+    // Skip the parent of the new node
+    if (nearIdx == nodes[newNodeIdx].parent) {
+        continue;
     }
 
+// Skip the parent of the new node
+if (nearIdx == nodes[newNodeIdx].parent) {
+  continue;
+}
 
-// Main RRT* algorithm
+// Check if the path is collision-free
+if (isPathClear(newNode, nodes[nearIdx], obstacles)) {
+  // Calculate cost through the new node
+  double costThroughNew = newNode.cost + distance(newNode, nodes[nearIdx]);
+  
+  // Rewire if the cost is lower
+  if (costThroughNew < nodes[nearIdx].cost) {
+      // Check for potential cycle
+      int tempParent = newNodeIdx;
+      bool wouldCreateCycle = false;
+      while (tempParent != -1) {
+          if (tempParent == nearIdx) {
+              wouldCreateCycle = true;
+              break;
+          }
+          tempParent = nodes[tempParent].parent;
+      }
+      
+      if (!wouldCreateCycle) {
+          nodes[nearIdx].cost = costThroughNew;
+          nodes[nearIdx].parent = newNodeIdx;
+      }
+  }
+}
+}
+
+// Second pass: non-recursive descendant cost update
+// Keep track of nodes that have been updated
+std::vector<bool> updated(nodes.size(), false);
+std::queue<int> nodesToUpdate;
+
+// Add all near nodes that were rewired to the queue
+for (int nearIdx : nearIndices) {
+if (nearIdx != nodes[newNodeIdx].parent && 
+  nodes[nearIdx].parent == newNodeIdx) {
+  nodesToUpdate.push(nearIdx);
+  updated[nearIdx] = true;
+}
+}
+
+// Process queue until empty
+while (!nodesToUpdate.empty()) {
+int currentIdx = nodesToUpdate.front();
+nodesToUpdate.pop();
+
+// Find children of current node
+for (size_t i = 0; i < nodes.size(); i++) {
+  if (nodes[i].parent == currentIdx) {
+      // Update child cost
+      double newCost = nodes[currentIdx].cost + distance(nodes[currentIdx], nodes[i]);
+      
+      // Only update if cost improves
+      if (newCost < nodes[i].cost) {
+          // Check for potential cycle before updating
+            int tempParent = currentIdx;
+            bool wouldCreateCycle = false;
+            while (tempParent != -1) {
+                if (tempParent == i) {
+                    wouldCreateCycle = true;
+                    break;
+                }
+                tempParent = nodes[tempParent].parent;
+            }
+            
+            if (!wouldCreateCycle) {
+                nodes[i].cost = newCost;
+                
+                // Add to queue if not already updated
+                if (!updated[i]) {
+                    nodesToUpdate.push(i);
+                    updated[i] = true;
+                }
+            }
+      }
+  }
+}
+}
+}
+
+// Main RRT* algorithm with option to stop at first solution
 std::vector<Node> buildRRTStar(
     const Node& start,
     const Node& goal,
@@ -164,7 +228,8 @@ std::vector<Node> buildRRTStar(
     double yMin,
     double yMax,
     const std::string& treeFilename,
-    bool enableVisualization
+    bool enableVisualization,
+    bool stopAtFirstSolution  // New parameter
 ) {
     // Start timing for all runs
     std::chrono::time_point<std::chrono::high_resolution_clock> startTime = std::chrono::high_resolution_clock::now();
@@ -185,6 +250,8 @@ std::vector<Node> buildRRTStar(
     
     // Main loop
     for (int i = 0; i < maxIterations; i++) {
+        //std::cout << "Iteration " << i << "/" << maxIterations << std::endl;
+
         // Get current time for this iteration
         auto currentTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = currentTime - startTime;
@@ -195,7 +262,9 @@ std::vector<Node> buildRRTStar(
                           goal : Node(xDist(gen), yDist(gen));
         
         // Find nearest node
+        //std::cout << "Iteration " << i << ": About to call findNearest" << std::endl;
         int nearestIndex = findNearest(nodes, randomNode);
+        //std::cout << "Iteration " << i << ": Finished findNearest" << std::endl;
         
         // Create new node by steering
         Node newNode = steer(nodes[nearestIndex], randomNode, stepSize);
@@ -219,20 +288,18 @@ std::vector<Node> buildRRTStar(
                 int newNodeIndex = nodes.size() - 1;
                 
                 // Rewire the tree
+                //std::cout << "Iteration " << i << ": About to call rewireTree" << std::endl;
                 rewireTree(nodes, newNodeIndex, nearIndices, obstacles);
-                
+                //std::cout << "Iteration " << i << ": Finished rewireTree" << std::endl;
+
                 // Check if we can reach the goal from this new node
                 double distToGoal = distance(newNode, goal);
                 if (distToGoal <= goalThreshold) {
+                    //std::cout << "Iteration " << i << ": Found goal!" << std::endl;
+
                     // Check if path to goal is collision-free
                     if (isPathClear(newNode, goal, obstacles)) {
-                        
-                        /*
-                         * Todo (Option 1)
-                         *   This is one of the option, which we search for the best
-                         *   path til the max iteration is reached. 
-                         */ 
-                        
+                        // Option 1: Continue searching for the optimal path until max iterations
                         double totalCost = newNode.cost + distToGoal;
                         
                         // If this path is better than previous solutions
@@ -255,34 +322,37 @@ std::vector<Node> buildRRTStar(
                                 goalNodeIndex = nodes.size() - 1;
                             } else {
                                 // Replace existing goal node with better path
-                                nodes[goalNodeIndex] = goalNode;
+                                int tempParent = newNodeIndex;
+                                bool wouldCreateCycle = false;
+                                while (tempParent != -1) {
+                                    if (tempParent == goalNodeIndex) {
+                                        wouldCreateCycle = true;
+                                        break;
+                                    }
+                                    tempParent = nodes[tempParent].parent;
+                                }
+                                
+                                if (!wouldCreateCycle) {
+                                    // Replace existing goal node with better path
+                                    nodes[goalNodeIndex] = goalNode;
+                                } else {
+                                    std::cout << "Avoided cycle when updating goal node" << std::endl;
+                                }
+                            }
+                            
+                            // Option 2: If we want to stop at first solution
+                            if (stopAtFirstSolution) {
+                                // Save the tree data if visualization is enabled
+                                if (enableVisualization) {
+                                    saveTreeToFile(nodes, treeFilename);
+                                }
+                                
+                                std::cout << "Goal reached in " << i << " iterations. Stopping search." << std::endl;
+                                
+                                // Extract and return path
+                                return extractPath(nodes, goalNodeIndex);
                             }
                         }
-
-                        /*
-                         * Todo (Option 2)
-                         *   This is the other option, which ends our search 
-                         *   once it reaches the goal.
-                         */ 
-
-                        // Node goalNode = goal;
-                        // goalNode.parent = newNodeIndex;
-                        
-                        // // Set time for goal node
-                        // auto goalTime = std::chrono::high_resolution_clock::now();
-                        // std::chrono::duration<double> goalElapsed = goalTime - startTime;
-                        // goalNode.time = goalElapsed.count();
-                        
-                        // nodes.push_back(goalNode);
-                        
-                        // // Save the tree data if visualization is enabled
-                        // if (enableVisualization) {
-                        //     saveTreeToFile(nodes, treeFilename);
-                        // }
-                        
-                        // // Extract and return path
-                        // return extractPath(nodes, nodes.size() - 1);
-        
                     }
                 }
             }

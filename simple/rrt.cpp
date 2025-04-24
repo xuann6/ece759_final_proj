@@ -43,10 +43,21 @@ Node steer(const Node& nearest, const Node& random, double stepSize) {
 
 // Extract path from start to goal by traversing the tree backwards
 std::vector<Node> extractPath(const std::vector<Node>& nodes, int goalIndex) {
+    //std::cout << "Entered extractPath with goalIndex: " << goalIndex << std::endl;
     std::vector<Node> path;
     int currentIndex = goalIndex;
     
+    // Safety check to prevent infinite loops due to cycles
+    std::vector<bool> visited(nodes.size(), false);
+    
     while (currentIndex != -1) {
+        // Check if we've already visited this node - signals a cycle
+        if (visited[currentIndex]) {
+            std::cout << "ERROR: Cycle detected in path at node " << currentIndex << std::endl;
+            break;
+        }
+        
+        visited[currentIndex] = true;
         path.push_back(nodes[currentIndex]);
         currentIndex = nodes[currentIndex].parent;
     }

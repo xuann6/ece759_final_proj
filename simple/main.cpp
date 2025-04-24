@@ -64,7 +64,7 @@ int main() {
     
     // Run RRT*
     std::vector<Node> pathRRTStar = rrt_star::buildRRTStar(
-        start, goal, obstacles, 0.1, 0.1, 1000, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_star_tree.csv", enableVisualization
+        start, goal, obstacles, 0.1, 0.1, 1000, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_star_tree.csv", enableVisualization, false
     );
     
     auto endTimeRRTStar = std::chrono::high_resolution_clock::now();
@@ -91,7 +91,7 @@ int main() {
     
     // Run Informed RRT*
     std::vector<Node> pathInformedRRTStar = rrt_informed::buildInformedRRTStar(
-        start, goal, obstacles, 0.1, 0.1, 1000, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_informed_tree.csv", enableVisualization
+        start, goal, obstacles, 0.1, 0.1, 1000, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_informed_tree.csv", enableVisualization, false
     );
     
     auto endTimeInformedRRTStar = std::chrono::high_resolution_clock::now();
