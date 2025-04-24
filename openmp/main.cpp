@@ -9,9 +9,11 @@
 
 int main() {
     // Configuration
-    bool enableVisualization = true;  // Set to false to disable visualization and improve performance
+    bool enableVisualization = false;  // Set to false to disable visualization and improve performance
     int numThreads = 4;               // Number of threads for OpenMP
     
+    int iterations = 10000;
+
     // Example usage
     Node start(0.1, 0.1);
     Node goal(0.9, 0.9);
@@ -20,7 +22,10 @@ int main() {
     double pathLengthRRTOmp = 0.0;
     double pathLengthRRTStar = 0.0;
     double pathLengthRRTStarOmp = 0.0;
+<<<<<<< HEAD
     double pathLengthRRTBiOmp = 0.0;
+=======
+>>>>>>> 753e6a2 (1. Fixed some bugs for OpenMP version.)
     
     std::cout << "Running RRT from (" << start.x << ", " << start.y << ") to (" 
               << goal.x << ", " << goal.y << ")" << std::endl;
@@ -36,7 +41,7 @@ int main() {
     
     // Run standard RRT
     std::vector<Node> pathRRT = buildRRT(
-        start, goal, 0.1, 0.1, 5000, 0.0, 1.0, 0.0, 1.0, "rrt_tree.csv", enableVisualization
+        start, goal, 0.1, 0.1, iterations, 0.0, 1.0, 0.0, 1.0, "rrt_tree.csv", enableVisualization
     );
     
     // End timer
@@ -63,7 +68,7 @@ int main() {
     
     // Run OpenMP RRT
     std::vector<Node> pathRRTOmp = rrt_omp::buildRRTOmp(
-        start, goal, 0.1, 0.1, 5000, 0.0, 1.0, 0.0, 1.0, "rrt_omp_tree.csv", enableVisualization, numThreads
+        start, goal, 0.1, 0.1, iterations, 0.0, 1.0, 0.0, 1.0, "rrt_omp_tree.csv", enableVisualization, numThreads
     );
     
     // End timer
@@ -93,7 +98,7 @@ int main() {
     
     // Run RRT*
     std::vector<Node> pathRRTStar = rrt_star::buildRRTStar(
-        start, goal, obstacles, 0.1, 0.1, 5000, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_star_tree.csv", enableVisualization
+        start, goal, obstacles, 0.1, 0.1, iterations, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_star_tree.csv", enableVisualization
     );
     
     // End timer
@@ -120,7 +125,7 @@ int main() {
     
     // Run OpenMP RRT*
     std::vector<Node> pathRRTStarOmp = rrt_star_omp::buildRRTStarOmp(
-        start, goal, obstacles, 0.1, 0.1, 5000, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_star_omp_tree.csv", enableVisualization, numThreads
+        start, goal, obstacles, 0.1, 0.1, iterations, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_star_omp_tree.csv", enableVisualization, numThreads
     );
     
     // End timer
