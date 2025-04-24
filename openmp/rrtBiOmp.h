@@ -4,9 +4,9 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include "rrt.h"
+#include "../simple/rrt.h"
 
-namespace bidirectional_rrt {
+namespace bidirectional_rrt_omp {
 
     // Find the closest pair of nodes between two trees
     std::pair<int, int> findClosestNodes(const std::vector<Node>& treeA, const std::vector<Node>& treeB);
@@ -50,7 +50,8 @@ namespace bidirectional_rrt {
         double yMin = 0.0,
         double yMax = 1.0,
         const std::string& treeFilename = "rrt_bidirectional_tree.csv",
-        bool enableVisualization = true
+        bool enableVisualization = true,
+        int numThreads = 4
     );
     
     // Build partial path from both trees when connection fails

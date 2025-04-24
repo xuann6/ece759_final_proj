@@ -2,6 +2,7 @@
 #include "../simple/rrtStar.h"
 #include "./rrtOmp.h"
 #include "./rrtStarOmp.h"
+#include "./rrtBiOmp.h"
 #include <iostream>
 #include <chrono>
 #include <iomanip>
@@ -18,7 +19,8 @@ int main() {
     double pathLengthRRT = 0.0;
     double pathLengthRRTOmp = 0.0;
     double pathLengthRRTStar = 0.0;
-    double pathLengthRRTStarOmp = h0.0;
+    double pathLengthRRTStarOmp = 0.0;
+    double pathLengthRRTBiOmp = 0.0;
     
     std::cout << "Running RRT from (" << start.x << ", " << start.y << ") to (" 
               << goal.x << ", " << goal.y << ")" << std::endl;
@@ -135,6 +137,34 @@ int main() {
         std::cout << "OpenMP RRT* path length: " << pathLengthRRTStarOmp << std::endl;
     } else {
         std::cout << "OpenMP RRT* failed to find a path" << std::endl;
+    }
+
+
+    // ===================== OpenMP RRT-Bi Test =====================
+    std::cout << "\n======== Parallel RRT-Bi (OpenMP) ========" << std::endl;
+    
+    // Start timer
+    auto startTimeRRTBiOmp = std::chrono::high_resolution_clock::now();
+    
+    // Run OpenMP RRT*
+    std::vector<Node> pathRRTBiOmp = bidirectional_rrt_omp::buildBidirectionalRRT(
+        start, goal, obstacles, 0.1, 0.1, 5000, 0.0, 1.0, 0.0, 1.0, "rrt_bi_omp_tree.csv", enableVisualization, numThreads
+    );
+    
+    // End timer
+    auto endTimeRRTBiOmp = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsedRRTBiOmp = endTimeRRTBiOmp - startTimeRRTBiOmp;
+    
+    if (!pathRRTBiOmp.empty()) {
+        std::cout << "OpenMP RRT-Bi path found with " << pathRRTBiOmp.size() << " nodes in "
+                << elapsedRRTBiOmp.count() << " seconds" << std::endl;
+        
+        for (int i = 1; i < pathRRTBiOmp.size(); i++) {
+            pathLengthRRTBiOmp += distance(pathRRTBiOmp[i-1], pathRRTBiOmp[i]);
+        }
+        std::cout << "OpenMP RRT-Bi path length: " << pathLengthRRTBiOmp << std::endl;
+    } else {
+        std::cout << "OpenMP RRT-Bi failed to find a path" << std::endl;
     }
    
     return 0;
