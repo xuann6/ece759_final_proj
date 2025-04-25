@@ -3,6 +3,7 @@
 #include "./rrtOmp.h"
 #include "./rrtStarOmp.h"
 #include "./rrtBiOmp.h"
+#include "./rrtInformedOmp.h"
 #include <iostream>
 #include <chrono>
 #include <iomanip>
@@ -22,10 +23,8 @@ int main() {
     double pathLengthRRTOmp = 0.0;
     double pathLengthRRTStar = 0.0;
     double pathLengthRRTStarOmp = 0.0;
-<<<<<<< HEAD
     double pathLengthRRTBiOmp = 0.0;
-=======
->>>>>>> 753e6a2 (1. Fixed some bugs for OpenMP version.)
+    double pathLengthRRTInformedOmp = 0.0
     
     std::cout << "Running RRT from (" << start.x << ", " << start.y << ") to (" 
               << goal.x << ", " << goal.y << ")" << std::endl;
@@ -170,6 +169,34 @@ int main() {
         std::cout << "OpenMP RRT-Bi path length: " << pathLengthRRTBiOmp << std::endl;
     } else {
         std::cout << "OpenMP RRT-Bi failed to find a path" << std::endl;
+    }
+
+    // ===================== OpenMP RRT-Informed Test =====================
+    std::cout << "\n======== Parallel Informed RRT* (OpenMP) ========" << std::endl;
+    
+    // Start timer
+    auto startTimeRRTInformedOmp = std::chrono::high_resolution_clock::now();
+    
+    // Run OpenMP Informed RRT*
+    std::vector<Node> pathRRTInformedOmp = rrt_informed_omp::buildInformedRRTStarOmp(
+        start, goal, obstacles, 0.1, 0.1, iterations, 0.5, 0.0, 1.0, 0.0, 1.0, 
+        "rrt_informed_omp_tree.csv", enableVisualization, numThreads, false
+    );
+    
+    // End timer
+    auto endTimeRRTInformedOmp = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsedRRTInformedOmp = endTimeRRTInformedOmp - startTimeRRTInformedOmp;
+    
+    if (!pathRRTInformedOmp.empty()) {
+        std::cout << "OpenMP Informed RRT* path found with " << pathRRTInformedOmp.size() << " nodes in "
+                << elapsedRRTInformedOmp.count() << " seconds" << std::endl;
+        
+        for (int i = 1; i < pathRRTInformedOmp.size(); i++) {
+            pathLengthRRTInformedOmp += distance(pathRRTInformedOmp[i-1], pathRRTInformedOmp[i]);
+        }
+        std::cout << "OpenMP Informed RRT* path length: " << pathLengthRRTInformedOmp << std::endl;
+    } else {
+        std::cout << "OpenMP Informed RRT* failed to find a path" << std::endl;
     }
    
     return 0;
