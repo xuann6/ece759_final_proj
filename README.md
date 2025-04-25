@@ -7,3 +7,4 @@ Final project repo for ECE759 High Performance Computing for Applications in Eng
 - Ayush Vijay Kedari
 - Ganesh Arivoli
 - Xu Xiong
+- Yuanpei Zhang
