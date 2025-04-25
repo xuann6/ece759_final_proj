@@ -24,7 +24,7 @@ int main() {
     double pathLengthRRTStar = 0.0;
     double pathLengthRRTStarOmp = 0.0;
     double pathLengthRRTBiOmp = 0.0;
-    double pathLengthRRTInformedOmp = 0.0
+    double pathLengthRRTInformedOmp = 0.0;
     
     std::cout << "Running RRT from (" << start.x << ", " << start.y << ") to (" 
               << goal.x << ", " << goal.y << ")" << std::endl;
