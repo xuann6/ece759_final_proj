@@ -1,6 +1,7 @@
 // rrtStarCuda.cu
 #include "rrtStarCuda.h"
 #include "cudaRRTUtils.h"
+#include "cudaRRTKernels.h"
 #include <thrust/device_vector.h>
 #include <thrust/extrema.h>
 #include <thrust/execution_policy.h>
@@ -42,61 +43,7 @@ RRTStarCudaData::~RRTStarCudaData() {
     if (d_randStates) cudaFree(d_randStates);
 }
 
-// CUDA kernel to initialize random states
-__global__ void initRandStatesKernel(curandState* states, unsigned long seed) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    curand_init(seed, idx, 0, &states[idx]);
-}
-
-// CUDA kernel to find the nearest node to a query point
-__global__ void findNearestKernel(float* nodeX, float* nodeY, int nodeCount, 
-                                float queryX, float queryY, 
-                                float* distances) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
-    if (idx < nodeCount) {
-        float dx = nodeX[idx] - queryX;
-        float dy = nodeY[idx] - queryY;
-        distances[idx] = dx*dx + dy*dy; // Squared distance (faster than sqrt)
-    }
-}
-
-// CUDA kernel to find nodes within a radius
-__global__ void findNodesInRadiusKernel(float* nodeX, float* nodeY, int nodeCount,
-                                      float queryX, float queryY, float radiusSq,
-                                      int* inRadius) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
-    if (idx < nodeCount) {
-        float dx = nodeX[idx] - queryX;
-        float dy = nodeY[idx] - queryY;
-        float distSq = dx*dx + dy*dy;
-        
-        // Mark as 1 if within radius, 0 otherwise
-        inRadius[idx] = (distSq <= radiusSq) ? 1 : 0;
-    }
-}
-
-// CUDA kernel for best parent selection
-__global__ void findBestParentKernel(float* nodeX, float* nodeY, float* nodeCost,
-                                   int* neighbors, int neighborCount,
-                                   float newX, float newY,
-                                   float* costToNew, float* minCost, int* bestParent) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
-    if (idx < neighborCount) {
-        int nodeIdx = neighbors[idx];
-        float dx = nodeX[nodeIdx] - newX;
-        float dy = nodeY[nodeIdx] - newY;
-        float edgeCost = sqrtf(dx*dx + dy*dy);
-        float totalCost = nodeCost[nodeIdx] + edgeCost;
-        
-        costToNew[idx] = totalCost;
-        
-        // Use our improved atomicMinFloat to update best parent
-        atomicMinFloat(minCost, totalCost, bestParent, nodeIdx);
-    }
-}
+// Kernel implementations are moved to cudaRRTKernels.h
 
 // CUDA kernel to populate the obstacle grid
 __global__ void populateObstacleGridKernel(float* obstacleX, float* obstacleY,
@@ -189,37 +136,7 @@ __global__ void checkCollisionGridKernel(float x1, float y1, float x2, float y2,
     }
 }
 
-// CUDA kernel for rewiring neighbors
-__global__ void rewireNeighborsKernel(float* nodeX, float* nodeY, float* nodeCost,
-                                    int* nodeParent, int newNodeIdx,
-                                    int* neighbors, int neighborCount,
-                                    float newX, float newY, float newCost,
-                                    int* rewireFlags) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
-    if (idx < neighborCount) {
-        int neighborIdx = neighbors[idx];
-        
-        // Skip if this is the parent of the new node
-        if (neighborIdx == nodeParent[newNodeIdx]) {
-            rewireFlags[idx] = 0;
-            return;
-        }
-        
-        // Calculate cost through new node
-        float dx = nodeX[neighborIdx] - newX;
-        float dy = nodeY[neighborIdx] - newY;
-        float edgeCost = sqrtf(dx*dx + dy*dy);
-        float costThroughNew = newCost + edgeCost;
-        
-        // Check if cheaper path found
-        if (costThroughNew < nodeCost[neighborIdx]) {
-            rewireFlags[idx] = 1;
-        } else {
-            rewireFlags[idx] = 0;
-        }
-    }
-}
+// Rewiring neighbors kernel is defined in cudaRRTKernels.h
 
 // CUDA kernel to update costs of descendants after rewiring
 __global__ void updateDescendantCostsKernel(float* nodeX, float* nodeY, 
@@ -255,25 +172,7 @@ __global__ void updateDescendantCostsKernel(float* nodeX, float* nodeY,
     }
 }
 
-// CUDA kernel for random sampling in configuration space
-__global__ void generateRandomNodeKernel(curandState* randStates, float* x, float* y,
-                                      float xMin, float xMax, float yMin, float yMax,
-                                      float goalBias, float goalX, float goalY) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
-    // Generate random number between 0 and 1
-    float r = curand_uniform(&randStates[idx]);
-    
-    // With probability goalBias, return the goal position
-    if (r < goalBias) {
-        *x = goalX;
-        *y = goalY;
-    } else {
-        // Otherwise, generate random position in configuration space
-        *x = xMin + curand_uniform(&randStates[idx]) * (xMax - xMin);
-        *y = yMin + curand_uniform(&randStates[idx]) * (yMax - yMin);
-    }
-}
+// Additional kernel implementations moved to cudaRRTKernels.h
 
 // Function to initialize CUDA resources
 void initCudaRRTStar(RRTStarCudaData& data, int maxNodes, int numObstacles, int numThreads) {
@@ -476,10 +375,14 @@ bool checkCollisionCuda(RRTStarCudaData& data, float x1, float y1, float x2, flo
             data.d_collisionResult);
     } else {
         // Fall back to traditional collision detection
-        int blocks = (data.h_obstacleCount + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        // Calculate number of blocks needed
+        int numBlocks = (data.h_obstacleCount + BLOCK_SIZE - 1) / BLOCK_SIZE;
         
-        // Old collision check kernel (implementation omitted)
-        // ...
+        // Launch kernel to check collisions
+        checkCollisionKernel<<<numBlocks, BLOCK_SIZE>>>(
+            x1, y1, x2, y2,
+            data.d_obstacleX, data.d_obstacleY, data.d_obstacleWidth, data.d_obstacleHeight,
+            data.h_obstacleCount, data.d_collisionResult);
     }
     
     CUDA_CHECK(cudaGetLastError());

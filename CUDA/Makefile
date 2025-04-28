@@ -18,7 +18,7 @@ NVCC_FLAGS = -std=c++14 -O3 $(CUDA_ARCH)
 INCLUDES = -I.
 
 # Source files
-COMMON_SRC = cudaRRTUtils.h
+COMMON_SRC = rrtCommon.h cudaRRTUtils.h cudaRRTKernels.h
 RRT_SRC = rrtCuda.cu
 RRT_STAR_SRC = rrtStarCuda.cu
 RRT_BI_SRC = rrtBidirectionalCuda.cu

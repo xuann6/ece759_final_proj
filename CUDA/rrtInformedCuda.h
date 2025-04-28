@@ -6,7 +6,6 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 #include <cfloat>
-#include "cudaRRTUtils.h"
 #include "rrtCommon.h" // shared Node/Obstacle definitions
 
 // Structure to represent an ellipsoidal sampling domain

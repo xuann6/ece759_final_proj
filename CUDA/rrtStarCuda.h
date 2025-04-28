@@ -5,7 +5,6 @@
 #include <string>
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
-#include "cudaRRTUtils.h"
 #include "rrtCommon.h"  // Shared Node / Obstacle definitions
 
 // Helper structure for CUDA device data

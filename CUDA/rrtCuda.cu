@@ -1,5 +1,6 @@
 // rrtCuda.cu
 #include "rrtCuda.h"
+#include "cudaRRTKernels.h"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <curand_kernel.h>
@@ -9,20 +10,6 @@
 #include <iostream>
 #include <chrono>
 #include <algorithm>
-
-// Define block size for CUDA kernels
-#define BLOCK_SIZE 256
-
-// CUDA error checking
-#define CUDA_CHECK(call) \
-do { \
-    cudaError_t error = call; \
-    if (error != cudaSuccess) { \
-        std::cerr << "CUDA error: " << cudaGetErrorString(error) << " at " \
-                  << __FILE__ << ":" << __LINE__ << std::endl; \
-        exit(EXIT_FAILURE); \
-    } \
-} while(0)
 
 // Destructor implementation
 RRTCudaData::~RRTCudaData() {
@@ -40,96 +27,7 @@ RRTCudaData::~RRTCudaData() {
     if (d_randStates) cudaFree(d_randStates);
 }
 
-// CUDA kernel to initialize random states
-__global__ void initRandStatesKernel(curandState* states, unsigned long seed) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    curand_init(seed, idx, 0, &states[idx]);
-}
-
-// CUDA kernel to find the nearest node to a query point
-__global__ void findNearestKernel(float* nodeX, float* nodeY, int nodeCount, 
-                                float queryX, float queryY, 
-                                float* distances) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
-    if (idx < nodeCount) {
-        float dx = nodeX[idx] - queryX;
-        float dy = nodeY[idx] - queryY;
-        distances[idx] = dx*dx + dy*dy; // Squared distance (faster than sqrt)
-    }
-}
-
-// CUDA kernel to check collision with obstacles
-__global__ void checkCollisionKernel(float x1, float y1, float x2, float y2,
-                                   float* obstacleX, float* obstacleY,
-                                   float* obstacleWidth, float* obstacleHeight,
-                                   int obstacleCount, bool* collisionResult) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
-    // Shared flag for collision detection
-    __shared__ bool sharedCollision;
-    
-    // Initialize shared flag in the first thread
-    if (threadIdx.x == 0) {
-        sharedCollision = false;
-    }
-    __syncthreads();
-    
-    if (idx < obstacleCount && !sharedCollision) {
-        // Line segment parameters
-        float dx = x2 - x1;
-        float dy = y2 - y1;
-        float lineLength = sqrtf(dx*dx + dy*dy);
-        
-        // Check a number of points along the line segment
-        const int NUM_CHECKS = 10;
-        bool localCollision = false;
-        
-        for (int i = 0; i <= NUM_CHECKS && !localCollision; i++) {
-            float t = (float)i / NUM_CHECKS;
-            float x = x1 + t * dx;
-            float y = y1 + t * dy;
-            
-            // Check if point is inside the obstacle
-            if (x >= obstacleX[idx] && x <= obstacleX[idx] + obstacleWidth[idx] &&
-                y >= obstacleY[idx] && y <= obstacleY[idx] + obstacleHeight[idx]) {
-                localCollision = true;
-            }
-        }
-        
-        // If collision detected, set the shared flag
-        if (localCollision) {
-            atomicExch((int*)&sharedCollision, true);
-        }
-    }
-    
-    __syncthreads();
-    
-    // Only one thread updates the final result
-    if (threadIdx.x == 0 && blockIdx.x == 0) {
-        *collisionResult = sharedCollision;
-    }
-}
-
-// CUDA kernel for random sampling in configuration space
-__global__ void generateRandomNodeKernel(curandState* randStates, float* x, float* y,
-                                      float xMin, float xMax, float yMin, float yMax,
-                                      float goalBias, float goalX, float goalY) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
-    // Generate random number between 0 and 1
-    float r = curand_uniform(&randStates[idx]);
-    
-    // With probability goalBias, return the goal position
-    if (r < goalBias) {
-        *x = goalX;
-        *y = goalY;
-    } else {
-        // Otherwise, generate random position in configuration space
-        *x = xMin + curand_uniform(&randStates[idx]) * (xMax - xMin);
-        *y = yMin + curand_uniform(&randStates[idx]) * (yMax - yMin);
-    }
-}
+// Kernel implementations are moved to cudaRRTKernels.h
 
 // Function to initialize CUDA resources
 void initCudaRRT(RRTCudaData& data, int maxNodes, int numObstacles, int numThreads) {
@@ -276,21 +174,7 @@ void addNodeCuda(RRTCudaData& data, float x, float y, int parent, float time) {
     data.h_nodeCount++;
 }
 
-// Steer function (implemented on host for simplicity)
-void steerCuda(float x1, float y1, float x2, float y2, float stepSize, float& newX, float& newY) {
-    float dx = x2 - x1;
-    float dy = y2 - y1;
-    float dist = sqrtf(dx*dx + dy*dy);
-    
-    if (dist <= stepSize) {
-        newX = x2;
-        newY = y2;
-    } else {
-        float ratio = stepSize / dist;
-        newX = x1 + ratio * dx;
-        newY = y1 + ratio * dy;
-    }
-}
+// Steer function is defined in cudaRRTKernels.h
 
 // Extract path from start to goal
 std::vector<Node> extractPathCuda(const RRTCudaData& data, int goalIndex) {
