@@ -5,10 +5,74 @@
 #include <algorithm>
 #include <fstream>
 #include <chrono>
+#include <unordered_map>
+#include <string>
+#include <iostream>
 
 namespace rrt_star {
+
+    // Timer class to measure function execution times
+    class FunctionTimer {
+    private:
+        static std::unordered_map<std::string, double> totalTimes;
+        static std::unordered_map<std::string, int> callCounts;
+        
+        std::string functionName;
+        std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
+
+    public:
+        FunctionTimer(const std::string& name) : functionName(name) {
+            startTime = std::chrono::high_resolution_clock::now();
+        }
+        
+        ~FunctionTimer() {
+            auto endTime = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = endTime - startTime;
+            totalTimes[functionName] += elapsed.count();
+            callCounts[functionName]++;
+        }
+        
+        static void printStatistics() {
+            std::cout << "\n--- Function Timing Statistics ---\n";
+            double totalTime = 0.0;
+            
+            // First, calculate the total time spent in all functions
+            for (const auto& entry : totalTimes) {
+                if (entry.first == "buildRRTStar") {
+                    totalTime = entry.second;
+                    break;
+                }
+            }
+            
+            if (totalTime == 0.0 && !totalTimes.empty()) {
+                // If buildRRTStar isn't found, use the sum of all function times
+                for (const auto& entry : totalTimes) {
+                    totalTime += entry.second;
+                }
+            }
+            
+            // Print statistics for each function
+            for (const auto& entry : totalTimes) {
+                const std::string& funcName = entry.first;
+                double funcTotalTime = entry.second;
+                int count = callCounts[funcName];
+                
+                std::cout << "Function: " << funcName << "\n";
+                std::cout << "  Total calls: " << count << "\n";
+                std::cout << "  Total time: " << funcTotalTime << " seconds\n";
+                std::cout << "  Average time per call: " << (funcTotalTime / count) << " seconds\n";
+                std::cout << "  Percentage of total: " << (funcTotalTime / totalTime * 100) << "%\n\n";
+            }
+        }
+    };
+
+    // Initialize static members
+    std::unordered_map<std::string, double> FunctionTimer::totalTimes;
+    std::unordered_map<std::string, int> FunctionTimer::callCounts;
+
     // Find nodes within a certain radius
     std::vector<int> findNearNodes(const std::vector<Node>& nodes, const Node& newNode, double radius) {
+        FunctionTimer timer("findNearNodes");
         std::vector<int> nearIndices;
         
         for (int i = 0; i < nodes.size(); i++) {
@@ -20,9 +84,9 @@ namespace rrt_star {
         return nearIndices;
     }
 
-
     // Check if the path between two nodes is collision-free
     bool isPathClear(const Node& from, const Node& to, const std::vector<std::vector<double>>& obstacles) {
+        FunctionTimer timer("isPathClear");
         // For each obstacle (represented as [x, y, radius])
         
         if (obstacles.empty()) {
@@ -87,6 +151,7 @@ namespace rrt_star {
     int chooseBestParent(const std::vector<Node>& nodes, const Node& newNode, 
                         const std::vector<int>& nearIndices, 
                         const std::vector<std::vector<double>>& obstacles) {
+        FunctionTimer timer("chooseBestParent");
         int bestParentIndex = -1;
         double bestCost = std::numeric_limits<double>::infinity();
         
@@ -111,6 +176,7 @@ namespace rrt_star {
     void rewireTree(std::vector<Node>& nodes, int newNodeIdx, 
                 const std::vector<int>& nearIndices,
                 const std::vector<std::vector<double>>& obstacles) {
+        FunctionTimer timer("rewireTree");
         const Node& newNode = nodes[newNodeIdx];
         
         for (int nearIdx : nearIndices) {
@@ -150,158 +216,162 @@ namespace rrt_star {
     }
 
 
-// Main RRT* algorithm
-std::vector<Node> buildRRTStar(
-    const Node& start,
-    const Node& goal,
-    const std::vector<std::vector<double>>& obstacles,
-    double stepSize,
-    double goalThreshold,
-    int maxIterations,
-    double rewireRadius,
-    double xMin,
-    double xMax,
-    double yMin,
-    double yMax,
-    const std::string& treeFilename,
-    bool enableVisualization
-) {
-    // Start timing for all runs
-    std::chrono::time_point<std::chrono::high_resolution_clock> startTime = std::chrono::high_resolution_clock::now();
-    
-    // Random number generation setup
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> xDist(xMin, xMax);
-    std::uniform_real_distribution<> yDist(yMin, yMax);
-    
-    // Initialize tree with start node (cost = 0)
-    std::vector<Node> nodes;
-    nodes.push_back(Node(start.x, start.y, -1, 0.0, 0.0)); // Start node at time 0, cost 0
-    
-    // Best solution found so far
-    double bestCost = std::numeric_limits<double>::infinity();
-    int goalNodeIndex = -1;
-    
-    // Main loop
-    for (int i = 0; i < maxIterations; i++) {
-        // Get current time for this iteration
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = currentTime - startTime;
-        double timeSeconds = elapsed.count();
+    // Main RRT* algorithm
+    std::vector<Node> buildRRTStar(
+        const Node& start,
+        const Node& goal,
+        const std::vector<std::vector<double>>& obstacles,
+        double stepSize,
+        double goalThreshold,
+        int maxIterations,
+        double rewireRadius,
+        double xMin,
+        double xMax,
+        double yMin,
+        double yMax,
+        const std::string& treeFilename,
+        bool enableVisualization
+    ) {
+        FunctionTimer timer("buildRRTStar");
         
-        // Generate random node (with small probability, sample the goal)
-        Node randomNode = (std::uniform_real_distribution<>(0, 1)(gen) < 0.05) ? 
-                          goal : Node(xDist(gen), yDist(gen));
+        // Start timing for all runs
+        std::chrono::time_point<std::chrono::high_resolution_clock> startTime = std::chrono::high_resolution_clock::now();
         
-        // Find nearest node
-        int nearestIndex = findNearest(nodes, randomNode);
+        // Random number generation setup
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<> xDist(xMin, xMax);
+        std::uniform_real_distribution<> yDist(yMin, yMax);
         
-        // Create new node by steering
-        Node newNode = steer(nodes[nearestIndex], randomNode, stepSize);
-        newNode.time = timeSeconds;
+        // Initialize tree with start node (cost = 0)
+        std::vector<Node> nodes;
+        nodes.push_back(Node(start.x, start.y, -1, 0.0, 0.0)); // Start node at time 0, cost 0
         
-        // Check if path to new node is collision-free
-        if (isPathClear(nodes[nearestIndex], newNode, obstacles)) {
-            // Find nodes within the rewiring radius
-            std::vector<int> nearIndices = findNearNodes(nodes, newNode, rewireRadius);
+        // Best solution found so far
+        double bestCost = std::numeric_limits<double>::infinity();
+        int goalNodeIndex = -1;
+        
+        // Main loop
+        for (int i = 0; i < maxIterations; i++) {
+            // Get current time for this iteration
+            auto currentTime = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = currentTime - startTime;
+            double timeSeconds = elapsed.count();
             
-            // Choose best parent
-            int bestParentIndex = chooseBestParent(nodes, newNode, nearIndices, obstacles);
+            // Generate random node (with small probability, sample the goal)
+            Node randomNode = (std::uniform_real_distribution<>(0, 1)(gen) < 0.05) ? 
+                            goal : Node(xDist(gen), yDist(gen));
             
-            if (bestParentIndex != -1) {
-                // Set parent and cost for the new node
-                newNode.parent = bestParentIndex;
-                newNode.cost = nodes[bestParentIndex].cost + distance(nodes[bestParentIndex], newNode);
+            // Find nearest node
+            int nearestIndex = findNearest(nodes, randomNode);
+            
+            // Create new node by steering
+            Node newNode = steer(nodes[nearestIndex], randomNode, stepSize);
+            newNode.time = timeSeconds;
+            
+            // Check if path to new node is collision-free
+            if (isPathClear(nodes[nearestIndex], newNode, obstacles)) {
+                // Find nodes within the rewiring radius
+                std::vector<int> nearIndices = findNearNodes(nodes, newNode, rewireRadius);
                 
-                // Add new node to tree
-                nodes.push_back(newNode);
-                int newNodeIndex = nodes.size() - 1;
+                // Choose best parent
+                int bestParentIndex = chooseBestParent(nodes, newNode, nearIndices, obstacles);
                 
-                // Rewire the tree
-                rewireTree(nodes, newNodeIndex, nearIndices, obstacles);
-                
-                // Check if we can reach the goal from this new node
-                double distToGoal = distance(newNode, goal);
-                if (distToGoal <= goalThreshold) {
-                    // Check if path to goal is collision-free
-                    if (isPathClear(newNode, goal, obstacles)) {
-                        
-                        /*
-                         * Todo (Option 1)
-                         *   This is one of the option, which we search for the best
-                         *   path til the max iteration is reached. 
-                         */ 
-                        
-                        double totalCost = newNode.cost + distToGoal;
-                        
-                        // If this path is better than previous solutions
-                        if (totalCost < bestCost) {
-                            bestCost = totalCost;
+                if (bestParentIndex != -1) {
+                    // Set parent and cost for the new node
+                    newNode.parent = bestParentIndex;
+                    newNode.cost = nodes[bestParentIndex].cost + distance(nodes[bestParentIndex], newNode);
+                    
+                    // Add new node to tree
+                    nodes.push_back(newNode);
+                    int newNodeIndex = nodes.size() - 1;
+                    
+                    // Rewire the tree
+                    rewireTree(nodes, newNodeIndex, nearIndices, obstacles);
+                    
+                    // Check if we can reach the goal from this new node
+                    double distToGoal = distance(newNode, goal);
+                    if (distToGoal <= goalThreshold) {
+                        // Check if path to goal is collision-free
+                        if (isPathClear(newNode, goal, obstacles)) {
                             
-                            // Create goal node
-                            Node goalNode = goal;
-                            goalNode.parent = newNodeIndex;
-                            goalNode.cost = totalCost;
+                            /*
+                            * Todo (Option 1)
+                            *   This is one of the option, which we search for the best
+                            *   path til the max iteration is reached. 
+                            */ 
                             
-                            // Set time for goal node
-                            auto goalTime = std::chrono::high_resolution_clock::now();
-                            std::chrono::duration<double> goalElapsed = goalTime - startTime;
-                            goalNode.time = goalElapsed.count();
+                            double totalCost = newNode.cost + distToGoal;
                             
-                            // Add or update goal node
-                            if (goalNodeIndex == -1) {
-                                nodes.push_back(goalNode);
-                                goalNodeIndex = nodes.size() - 1;
-                            } else {
-                                // Replace existing goal node with better path
-                                nodes[goalNodeIndex] = goalNode;
+                            // If this path is better than previous solutions
+                            if (totalCost < bestCost) {
+                                bestCost = totalCost;
+                                
+                                // Create goal node
+                                Node goalNode = goal;
+                                goalNode.parent = newNodeIndex;
+                                goalNode.cost = totalCost;
+                                
+                                // Set time for goal node
+                                auto goalTime = std::chrono::high_resolution_clock::now();
+                                std::chrono::duration<double> goalElapsed = goalTime - startTime;
+                                goalNode.time = goalElapsed.count();
+                                
+                                // Add or update goal node
+                                if (goalNodeIndex == -1) {
+                                    nodes.push_back(goalNode);
+                                    goalNodeIndex = nodes.size() - 1;
+                                } else {
+                                    // Replace existing goal node with better path
+                                    nodes[goalNodeIndex] = goalNode;
+                                }
                             }
+
+                            /*
+                            * Todo (Option 2)
+                            *   This is the other option, which ends our search 
+                            *   once it reaches the goal.
+                            */ 
+
+                            // Node goalNode = goal;
+                            // goalNode.parent = newNodeIndex;
+                            
+                            // // Set time for goal node
+                            // auto goalTime = std::chrono::high_resolution_clock::now();
+                            // std::chrono::duration<double> goalElapsed = goalTime - startTime;
+                            // goalNode.time = goalElapsed.count();
+                            
+                            // nodes.push_back(goalNode);
+                            
+                            // // Save the tree data if visualization is enabled
+                            // if (enableVisualization) {
+                            //     saveTreeToFile(nodes, treeFilename);
+                            // }
+                            
+                            // // Extract and return path
+                            // return extractPath(nodes, nodes.size() - 1);
+            
                         }
-
-                        /*
-                         * Todo (Option 2)
-                         *   This is the other option, which ends our search 
-                         *   once it reaches the goal.
-                         */ 
-
-                        // Node goalNode = goal;
-                        // goalNode.parent = newNodeIndex;
-                        
-                        // // Set time for goal node
-                        // auto goalTime = std::chrono::high_resolution_clock::now();
-                        // std::chrono::duration<double> goalElapsed = goalTime - startTime;
-                        // goalNode.time = goalElapsed.count();
-                        
-                        // nodes.push_back(goalNode);
-                        
-                        // // Save the tree data if visualization is enabled
-                        // if (enableVisualization) {
-                        //     saveTreeToFile(nodes, treeFilename);
-                        // }
-                        
-                        // // Extract and return path
-                        // return extractPath(nodes, nodes.size() - 1);
-        
                     }
                 }
             }
         }
+        
+        // Save the tree data if visualization is enabled
+        if (enableVisualization) {
+            saveTreeToFile(nodes, treeFilename);
+        }
+        
+        // Print timing statistics
+        FunctionTimer::printStatistics();
+        
+        // If goal was reached, extract and return the path
+        if (goalNodeIndex != -1) {
+            return extractPath(nodes, goalNodeIndex);
+        } else {
+            // If goal not reached, return empty path
+            std::cout << "Goal not reached within max iterations." << std::endl;
+            return std::vector<Node>();
+        }
     }
-    
-    // Save the tree data if visualization is enabled
-    if (enableVisualization) {
-        saveTreeToFile(nodes, treeFilename);
-    }
-    
-    // If goal was reached, extract and return the path
-    if (goalNodeIndex != -1) {
-        return extractPath(nodes, goalNodeIndex);
-    } else {
-        // If goal not reached, return empty path
-        std::cout << "Goal not reached within max iterations." << std::endl;
-        return std::vector<Node>();
-    }
-}
-
-} // end of using namespace
+} // end of namespace
