@@ -1,0 +1,137 @@
+# Install dependencies
+!pip install -q tensorflow matplotlib
+
+# Import libraries
+import tensorflow as tf
+import matplotlib.pyplot as plt
+
+# Detect TPU
+try:
+    tpu = tf.distribute.cluster_resolver.TPUClusterResolver()
+    tf.config.experimental_connect_to_cluster(tpu)
+    tf.tpu.experimental.initialize_tpu_system(tpu)
+    strategy = tf.distribute.TPUStrategy(tpu)
+    print("Running on TPU")
+except:
+    strategy = tf.distribute.get_strategy()
+    print("Running on CPU/GPU")
+    
+print("Number of accelerators:", strategy.num_replicas_in_sync)
+
+# Define RRT with Obstacles
+class RRTWithObstacles:
+    def __init__(self, start, goal, x_range, y_range, obstacles, step_size=0.05, goal_sample_rate=0.1, max_iterations=1000):
+        self.start = tf.constant(start, dtype=tf.float32)
+        self.goal = tf.constant(goal, dtype=tf.float32)
+        self.x_range = x_range
+        self.y_range = y_range
+        self.obstacles = tf.constant(obstacles, dtype=tf.float32)
+        self.step_size = step_size
+        self.goal_sample_rate = goal_sample_rate
+        self.max_iterations = max_iterations
+        
+        # ✅ Use Python lists, not tf.Variable
+        self.nodes = [self.start.numpy()]
+        self.parents = [-1]
+
+    def distance(self, a, b):
+        return tf.norm(a - b, axis=-1)
+
+    def sample(self):
+        if tf.random.uniform(()) < self.goal_sample_rate:
+            return self.goal
+        else:
+            x = tf.random.uniform((), self.x_range[0], self.x_range[1])
+            y = tf.random.uniform((), self.y_range[0], self.y_range[1])
+            return tf.stack([x, y])
+
+    def nearest(self, sample):
+        nodes_tensor = tf.convert_to_tensor(self.nodes, dtype=tf.float32)
+        distances = self.distance(nodes_tensor, sample)
+        return tf.argmin(distances)
+
+    def steer(self, from_node, to_node):
+        direction = to_node - from_node
+        dist = tf.norm(direction)
+        if dist <= self.step_size:
+            return to_node
+        else:
+            direction = direction / dist
+            return from_node + direction * self.step_size
+
+    def collision_check(self, point):
+        x, y = point[0], point[1]
+        inside_x = tf.logical_and(x >= self.obstacles[:, 0], x <= self.obstacles[:, 2])
+        inside_y = tf.logical_and(y >= self.obstacles[:, 1], y <= self.obstacles[:, 3])
+        inside = tf.logical_and(inside_x, inside_y)
+        return tf.reduce_any(inside)
+
+    def plan(self):
+        for _ in range(self.max_iterations):
+            random_point = self.sample()
+            nearest_idx = int(self.nearest(random_point))
+            nearest_node = tf.constant(self.nodes[nearest_idx], dtype=tf.float32)
+            new_node = self.steer(nearest_node, random_point)
+
+            if self.collision_check(new_node):
+                continue
+
+            # ✅ append to list
+            self.nodes.append(new_node.numpy())
+            self.parents.append(nearest_idx)
+
+            if self.distance(new_node, self.goal) <= self.step_size:
+                if not self.collision_check(self.goal):
+                    self.nodes.append(self.goal.numpy())
+                    self.parents.append(len(self.nodes) - 2)
+                    print(f"Goal reached with {len(self.nodes)} nodes!")
+                    return self.extract_path()
+
+        print("Goal not reached within max iterations.")
+        return None
+
+    def extract_path(self):
+        path = []
+        current_idx = len(self.parents) - 1
+        while current_idx != -1:
+            path.append(self.nodes[current_idx])
+            current_idx = self.parents[current_idx]
+        path.reverse()
+        return path
+
+# Set problem
+start = [0.1, 0.1]
+goal = [0.9, 0.9]
+x_range = (0.0, 1.0)
+y_range = (0.0, 1.0)
+obstacles = [
+    [0.3, 0.0, 0.4, 0.6],
+    [0.6, 0.4, 0.7, 1.0]
+]
+
+# Plan path
+with strategy.scope():
+    rrt = RRTWithObstacles(start, goal, x_range, y_range, obstacles, step_size=0.05, goal_sample_rate=0.1, max_iterations=5000)
+    path = rrt.plan()
+
+# Plot result
+def plot_path(path, obstacles):
+    fig, ax = plt.subplots()
+    if path:
+        xs, ys = zip(*path)
+        ax.plot(xs, ys, marker='o', color='blue')
+    else:
+        print("No path to plot.")
+
+    for obs in obstacles:
+        rect = plt.Rectangle((obs[0], obs[1]), obs[2] - obs[0], obs[3] - obs[1], color='red', alpha=0.5)
+        ax.add_patch(rect)
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.grid(True)
+    ax.set_aspect('equal')
+    plt.title('TPU-accelerated RRT with Obstacles')
+    plt.show()
+
+plot_path(path, obstacles)

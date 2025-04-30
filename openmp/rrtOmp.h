@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include "rrt.h"
+#include "../simple/rrt.h"
 
 namespace rrt_omp {
     

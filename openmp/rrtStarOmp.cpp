@@ -1,3 +1,4 @@
+#include "rrtOmp.h"
 #include "rrtStarOmp.h"
 #include "../simple/rrtStar.h"
 #include <cmath>

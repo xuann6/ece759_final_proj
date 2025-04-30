@@ -1,0 +1,17 @@
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Executables
+*.exe
+*.out
+*.app
+rrt_cuda
+
+# Generated CSV files
+rrt_*_cuda_tree.csv
+
+# Temporary files
+*~

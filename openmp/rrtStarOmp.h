@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include "../simple/rrt.h"
+#include "rrtOmp.h"
 
 namespace rrt_star_omp {
 

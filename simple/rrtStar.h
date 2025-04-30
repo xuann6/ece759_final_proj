@@ -62,7 +62,8 @@ namespace rrt_star {
         double yMin = 0.0,
         double yMax = 1.0,
         const std::string& treeFilename = "rrt_star_tree.csv",
-        bool enableVisualization = true
+        bool enableVisualization = true,
+        bool stopAtFirstSolution = false
     );
 }
 #endif // RRT_STAR_H

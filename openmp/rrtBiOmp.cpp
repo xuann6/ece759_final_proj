@@ -1,5 +1,5 @@
-#include <rrtBiOmp.h>
-#include <rrtOmp.h>
+#include "rrtBiOmp.h"
+#include "rrtOmp.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -226,7 +226,7 @@ namespace bidirectional_rrt_omp {
         
         // Connect the trees by setting the parent of the first goal tree node
         if (mergedTree.size() > startTreeSize && goalConnectIndex >= 0 && startConnectIndex >= 0) {
-            mergedTree[goalConnectIndex].parent = startConnectIndex;
+            mergedTree[startTreeSize + goalConnectIndex].parent = startConnectIndex;
         }
         
         return mergedTree;
@@ -257,7 +257,22 @@ namespace bidirectional_rrt_omp {
         return path;
     }
     
-    // Main Bidirectional RRT algorithm - modified for parallelism
+    // Helper function to extract path from a tree
+    // Explicitly named to avoid ambiguity
+    std::vector<Node> extractPathFromTree(const std::vector<Node>& tree, int endNodeIndex) {
+        std::vector<Node> path;
+        int currentIdx = endNodeIndex;
+        
+        while (currentIdx != -1 && currentIdx < tree.size()) {
+            path.push_back(tree[currentIdx]);
+            currentIdx = tree[currentIdx].parent;
+        }
+        
+        std::reverse(path.begin(), path.end());
+        return path;
+    }
+    
+    // Main Bidirectional RRT algorithm - modified to remove OpenMP in this function
     std::vector<Node> buildBidirectionalRRT(
         const Node& start,
         const Node& goal,
@@ -273,99 +288,106 @@ namespace bidirectional_rrt_omp {
         bool enableVisualization,
         int numThreads
     ) {
-        // Initialize trees with their respective roots
+        // Set the number of threads for the whole program
+        // but we don't use OpenMP directives in this function
         omp_set_num_threads(numThreads);
+        
+        // Initialize trees with their respective roots
         std::vector<Node> startTree = {start};
         std::vector<Node> goalTree = {goal};
         
-        // Random number generation - unique seed for each thread
-        unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
-        std::mt19937 gen(seed);
+        // Random number generation
+        std::random_device rd;
+        std::mt19937 gen(rd());
         std::uniform_real_distribution<> disX(xMin, xMax);
         std::uniform_real_distribution<> disY(yMin, yMax);
         
         bool useStartTree = true; // Flag to alternate between trees
-        bool treesConnected = false;
-        int connectedIteration = -1;
         
-        // Set up parallel seed
-        #pragma omp parallel
-        {
-            // Each thread gets a unique seed based on thread number
-            unsigned int thread_seed = seed + omp_get_thread_num();
-            std::mt19937 thread_gen(thread_seed);
-        }
-        
-        // Execute iterations in chunks to periodically check for connections
-        for (int iter = 0; iter < maxIterations && !treesConnected; iter += 10) {
-            // Use task-based parallelism for batches of iterations
-            #pragma omp parallel for schedule(dynamic)
-            for (int batch = 0; batch < 10 && iter + batch < maxIterations; batch++) {
-                // Skip if we already found a connection
-                if (treesConnected) continue;
-                
-                int currentIter = iter + batch;
-                // Thread-local random number generators
-                std::mt19937 thread_gen(seed + omp_get_thread_num() + currentIter);
-                std::uniform_real_distribution<> thread_disX(xMin, xMax);
-                std::uniform_real_distribution<> thread_disY(yMin, yMax);
-                
-                // Generate random node
-                Node randomNode(thread_disX(thread_gen), thread_disY(thread_gen));
-                
-                // Determine which tree to extend (alternate based on iteration)
-                bool localUseStartTree = ((currentIter % 2) == 0);
-                
-                // Need critical sections when accessing the trees
-                #pragma omp critical
-                {
-                    std::vector<Node>& currentTree = localUseStartTree ? startTree : goalTree;
-                    std::vector<Node>& otherTree = localUseStartTree ? goalTree : startTree;
+        for (int iter = 0; iter < maxIterations; iter++) {
+            // Generate random node
+            Node randomNode(disX(gen), disY(gen));
+            
+            // Determine which tree to extend
+            std::vector<Node>& currentTree = useStartTree ? startTree : goalTree;
+            std::vector<Node>& otherTree = useStartTree ? goalTree : startTree;
+            
+            // Extend the current tree
+            if (extendTree(currentTree, randomNode, obstacles, stepSize)) {
+                // Try to connect the trees
+                if (tryConnect(currentTree, otherTree, obstacles, stepSize, connectThreshold)) {
+                    // Trees connected! Extract and return the path
+                    auto closestPair = findClosestNodes(startTree, goalTree);
+                    int startConnectIdx = closestPair.first;
+                    int goalConnectIdx = closestPair.second;
                     
-                    // Extend the current tree
-                    if (extendTree(currentTree, randomNode, obstacles, stepSize)) {
-                        // Try to connect the trees
-                        if (tryConnect(currentTree, otherTree, obstacles, stepSize, connectThreshold)) {
-                            treesConnected = true;
-                            connectedIteration = currentIter;
-                        }
+                    if (startConnectIdx < 0 || goalConnectIdx < 0) {
+                        continue; // Skip if no valid connection found
                     }
+                    
+                    // Merge trees
+                    std::vector<Node> mergedTree = mergeTrees(
+                        startTree, startConnectIdx, 
+                        goalTree, goalConnectIdx
+                    );
+
+                    Node connectingNode(startTree[closestPair.first].x, startTree[closestPair.first].y);
+                    connectingNode.parent = closestPair.second;
+                    connectingNode.time = goalTree.size();
+                    goalTree.push_back(connectingNode);
+                    
+                    // Save trees for visualization if enabled
+                    if (enableVisualization) {
+                        saveTreesToFile(startTree, goalTree, treeFilename);
+                    }
+                    
+                    // Extract and return the final path
+                    return extractBidirectionalPath(
+                        mergedTree, 
+                        0,  // Start is always the first node in the start tree
+                        startTree.size() + goalConnectIdx  // Goal is in the merged tree at this index
+                    );
                 }
             }
             
-            // Check direct connection after each batch
-            if (!treesConnected && isGoalReached(startTree, goalTree, obstacles, connectThreshold)) {
-                treesConnected = true;
-                connectedIteration = iter;
-            }
-        }
-        
-        // If we found a connection
-        if (treesConnected) {
-            auto closestPair = findClosestNodes(startTree, goalTree);
+            // Alternate between trees
+            useStartTree = !useStartTree;
             
-            // Merge trees
-            std::vector<Node> mergedTree = mergeTrees(
-                startTree, closestPair.first, 
-                goalTree, closestPair.second
-            );
+            // Check direct connection periodically (every 10 iterations)
+            if (iter % 10 == 0) {
+                if (isGoalReached(startTree, goalTree, obstacles, connectThreshold)) {
+                    auto closestPair = findClosestNodes(startTree, goalTree);
+                    int startConnectIdx = closestPair.first;
+                    int goalConnectIdx = closestPair.second;
+                    
+                    if (startConnectIdx < 0 || goalConnectIdx < 0) {
+                        continue; // Skip if no valid connection found
+                    }
+                    
+                    // Merge trees
+                    std::vector<Node> mergedTree = mergeTrees(
+                        startTree, startConnectIdx, 
+                        goalTree, goalConnectIdx
+                    );
 
-            Node connectingNode(startTree[closestPair.first].x, startTree[closestPair.first].y);
-            connectingNode.parent = closestPair.second;
-            connectingNode.time = goalTree.size();
-            goalTree.push_back(connectingNode);
-            
-            // Save trees for visualization if enabled
-            if (enableVisualization) {
-                saveTreesToFile(startTree, goalTree, treeFilename);
+                    Node connectingNode(startTree[closestPair.first].x, startTree[closestPair.first].y);
+                    connectingNode.parent = closestPair.second;
+                    connectingNode.time = goalTree.size();
+                    goalTree.push_back(connectingNode);
+                    
+                    // Save trees for visualization if enabled
+                    if (enableVisualization) {
+                        saveTreesToFile(startTree, goalTree, treeFilename);
+                    }
+                    
+                    // Extract and return the final path
+                    return extractBidirectionalPath(
+                        mergedTree, 
+                        0,  // Start is always the first node in the start tree
+                        startTree.size() + goalConnectIdx  // Goal is in the merged tree at this index
+                    );
+                }
             }
-            
-            // Extract and return the final path
-            return extractBidirectionalPath(
-                mergedTree, 
-                0,  // Start is always the first node in the start tree
-                startTree.size() + goalTree.size() - 1  // Goal is the last node in the merged tree
-            );
         }
         
         // If we reached max iterations without connecting the trees
@@ -385,6 +407,11 @@ namespace bidirectional_rrt_omp {
     ) {
         std::vector<Node> partialPath;
         
+        // Check for empty trees
+        if (startTree.empty() || goalTree.empty()) {
+            return partialPath; // Return empty path
+        }
+        
         // Find closest nodes between trees
         auto closestPair = findClosestNodes(startTree, goalTree);
         int startConnectIdx = closestPair.first;
@@ -395,18 +422,26 @@ namespace bidirectional_rrt_omp {
         }
         
         // Extract path from start to closest node in start tree
-        std::vector<Node> startPath = extractPath(startTree, startConnectIdx);
+        std::vector<Node> startPath = extractPathFromTree(startTree, startConnectIdx);
         
         // Extract path from closest node in goal tree to goal
-        std::vector<Node> goalPath = extractPath(goalTree, goalConnectIdx);
-        // Reverse goal path since extractPath works backwards
+        std::vector<Node> goalPath = extractPathFromTree(goalTree, goalConnectIdx);
+        // Reverse goal path since extractPath returns path from node to root
         std::reverse(goalPath.begin(), goalPath.end());
         
         // Check if the closest nodes can be connected safely
         if (isPathClear(startTree[startConnectIdx], goalTree[goalConnectIdx], obstacles)) {
             // Combine paths
             partialPath = startPath;
-            partialPath.insert(partialPath.end(), goalPath.begin(), goalPath.end());
+            
+            // Create connecting node
+            Node connectingNode = goalTree[goalConnectIdx];
+            partialPath.push_back(connectingNode);
+            
+            // Add the goal path (excluding the first node which is already added)
+            if (goalPath.size() > 1) {
+                partialPath.insert(partialPath.end(), goalPath.begin() + 1, goalPath.end());
+            }
         } else {
             // Return just the path from start - better to have a partial path than none
             partialPath = startPath;
@@ -446,7 +481,6 @@ namespace bidirectional_rrt_omp {
             
             file << (i + startSize) << "," << node.x << "," << node.y << ","
                  << parentId << "," << node.time << std::endl;
-            
         }
         
         file.close();
