@@ -10,70 +10,68 @@
 #include <iostream>
 #include <queue>
 
-namespace rrt_star {
+namespace rrt_star
+{
 
     // Timer class to measure function execution times
-    class FunctionTimer {
-    private:
-        static std::unordered_map<std::string, double> totalTimes;
-        static std::unordered_map<std::string, int> callCounts;
-        
-        std::string functionName;
-        std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
+    // class FunctionTimer {
+    // private:
+    //     static std::unordered_map<std::string, double> totalTimes;
+    //     static std::unordered_map<std::string, int> callCounts;
 
-    public:
-        FunctionTimer(const std::string& name) : functionName(name) {
-            startTime = std::chrono::high_resolution_clock::now();
-        }
-        
-        ~FunctionTimer() {
-            auto endTime = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = endTime - startTime;
-            totalTimes[functionName] += elapsed.count();
-            callCounts[functionName]++;
-        }
-        
-        static void printStatistics() {
-            std::cout << "\n--- Function Timing Statistics ---\n";
-            double totalTime = 0.0;
-            
-            // First, calculate the total time spent in all functions
-            for (const auto& entry : totalTimes) {
-                if (entry.first == "buildRRTStar") {
-                    totalTime = entry.second;
-                    break;
-                }
-            }
-            
-            if (totalTime == 0.0 && !totalTimes.empty()) {
-                // If buildRRTStar isn't found, use the sum of all function times
-                for (const auto& entry : totalTimes) {
-                    totalTime += entry.second;
-                }
-            }
-            
-            // Print statistics for each function
-            for (const auto& entry : totalTimes) {
-                const std::string& funcName = entry.first;
-                double funcTotalTime = entry.second;
-                int count = callCounts[funcName];
-                
-                std::cout << "Function: " << funcName << "\n";
-                std::cout << "  Total calls: " << count << "\n";
-                std::cout << "  Total time: " << funcTotalTime << " seconds\n";
-                std::cout << "  Average time per call: " << (funcTotalTime / count) << " seconds\n";
-                std::cout << "  Percentage of total: " << (funcTotalTime / totalTime * 100) << "%\n\n";
-            }
-        }
-    };
+    //     std::string functionName;
+    //     std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
 
-    // Initialize static members
-    std::unordered_map<std::string, double> FunctionTimer::totalTimes;
-    std::unordered_map<std::string, int> FunctionTimer::callCounts;
+    // public:
+    //     FunctionTimer(const std::string& name) : functionName(name) {
+    //         startTime = std::chrono::high_resolution_clock::now();
+    //     }
+
+    //     ~FunctionTimer() {
+    //         auto endTime = std::chrono::high_resolution_clock::now();
+    //         std::chrono::duration<double> elapsed = endTime - startTime;
+    //         totalTimes[functionName] += elapsed.count();
+    //         callCounts[functionName]++;
+    //     }
+
+    //     static void printStatistics() {
+    //         std::cout << "\n--- Function Timing Statistics ---\n";
+    //         double totalTime = 0.0;
+
+    //         // First, calculate the total time spent in all functions
+    //         for (const auto& entry : totalTimes) {
+    //             if (entry.first == "buildRRTStar") {
+    //                 totalTime = entry.second;
+    //                 break;
+    //             }
+    //         }
+
+    //         if (totalTime == 0.0 && !totalTimes.empty()) {
+    //             // If buildRRTStar isn't found, use the sum of all function times
+    //             for (const auto& entry : totalTimes) {
+    //                 totalTime += entry.second;
+    //             }
+    //         }
+
+    //         // Print statistics for each function
+    //         for (const auto& entry : totalTimes) {
+    //             const std::string& funcName = entry.first;
+    //             double funcTotalTime = entry.second;
+    //             int count = callCounts[funcName];
+
+    //             std::cout << "Function: " << funcName << "\n";
+    //             std::cout << "  Total calls: " << count << "\n";
+    //             std::cout << "  Total time: " << funcTotalTime << " seconds\n";
+    //             std::cout << "  Average time per call: " << (funcTotalTime / count) << " seconds\n";
+    //             std::cout << "  Percentage of total: " << (funcTotalTime / totalTime * 100) << "%\n\n";
+    //         }
+    //     }
+    // };
 
     // Find nodes within a certain radius
-    std::vector<int> findNearNodes(const std::vector<Node>& nodes, const Node& newNode, double radius) {
-        FunctionTimer timer("findNearNodes");
+    std::vector<int> findNearNodes(const std::vector<Node> &nodes, const Node &newNode, double radius)
+    {
+        GlobalFunctionTimer timer("findNearNodes");
         std::vector<int> nearIndices;
 
         for (int i = 0; i < nodes.size(); i++)
@@ -88,8 +86,9 @@ namespace rrt_star {
     }
 
     // Check if the path between two nodes is collision-free
-    bool isPathClear(const Node& from, const Node& to, const std::vector<std::vector<double>>& obstacles) {
-        FunctionTimer timer("isPathClear");
+    bool isPathClear(const Node &from, const Node &to, const std::vector<std::vector<double>> &obstacles)
+    {
+        GlobalFunctionTimer timer("isPathClear");
         // For each obstacle (represented as [x, y, radius])
         // std::cout << "Entered isPathClear." << std::endl;
 
@@ -162,10 +161,11 @@ namespace rrt_star {
     }
 
     // Choose best parent for a new node (RRT* specific)
-    int chooseBestParent(const std::vector<Node>& nodes, const Node& newNode, 
-                        const std::vector<int>& nearIndices, 
-                        const std::vector<std::vector<double>>& obstacles) {
-        FunctionTimer timer("chooseBestParent");
+    int chooseBestParent(const std::vector<Node> &nodes, const Node &newNode,
+                         const std::vector<int> &nearIndices,
+                         const std::vector<std::vector<double>> &obstacles)
+    {
+        GlobalFunctionTimer timer("chooseBestParent");
         int bestParentIndex = -1;
         double bestCost = std::numeric_limits<double>::infinity();
 
@@ -192,15 +192,18 @@ namespace rrt_star {
     }
 
     // Rewire the tree to optimize paths (RRT* specific)
-    void rewireTree(std::vector<Node>& nodes, int newNodeIdx, 
-                const std::vector<int>& nearIndices,
-                const std::vector<std::vector<double>>& obstacles) {
-        FunctionTimer timer("rewireTree");
-        const Node& newNode = nodes[newNodeIdx];
+    void rewireTree(std::vector<Node> &nodes, int newNodeIdx,
+                    const std::vector<int> &nearIndices,
+                    const std::vector<std::vector<double>> &obstacles)
+    {
+        GlobalFunctionTimer timer("rewireTree");
+        const Node &newNode = nodes[newNodeIdx];
         int nodeCount = nodes.size(); // Track actual number of nodes
-        for (int nearIdx : nearIndices) {
+        for (int nearIdx : nearIndices)
+        {
             // Skip the parent of the new node
-            if (nearIdx == nodes[newNodeIdx].parent || nearIdx >= nodeCount || nearIdx < 0) {
+            if (nearIdx == nodes[newNodeIdx].parent || nearIdx >= nodeCount || nearIdx < 0)
+            {
                 continue;
             }
 
@@ -308,7 +311,8 @@ namespace rrt_star {
         bool stopAtFirstSolution // New parameter
     )
     {
-        FunctionTimer timer("buildRRTStar");
+        GlobalFunctionTimer::reset();
+        GlobalFunctionTimer timer("buildRRTStar");
         // Start timing for all runs
         std::chrono::time_point<std::chrono::high_resolution_clock> startTime = std::chrono::high_resolution_clock::now();
 
@@ -439,7 +443,7 @@ namespace rrt_star {
                                     }
 
                                     // Print timing statistics
-                                    FunctionTimer::printStatistics();
+                                    GlobalFunctionTimer::printStatistics();
 
                                     std::cout << "Goal reached in " << i << " iterations. Stopping search." << std::endl;
 
@@ -458,9 +462,9 @@ namespace rrt_star {
         {
             saveTreeToFile(nodes, treeFilename);
         }
-      
+
         // Print timing statistics
-        FunctionTimer::printStatistics();
+        GlobalFunctionTimer::printStatistics();
 
         // If goal was reached, extract and return the path
         if (goalNodeIndex != -1)

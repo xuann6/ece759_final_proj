@@ -12,67 +12,64 @@
 namespace rrt_informed {
 
     // Timer class to measure function execution times
-    class FunctionTimer {
-    private:
-        static std::unordered_map<std::string, double> totalTimes;
-        static std::unordered_map<std::string, int> callCounts;
+    // class FunctionTimer {
+    // private:
+    //     static std::unordered_map<std::string, double> totalTimes;
+    //     static std::unordered_map<std::string, int> callCounts;
         
-        std::string functionName;
-        std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
+    //     std::string functionName;
+    //     std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
 
-    public:
-        FunctionTimer(const std::string& name) : functionName(name) {
-            startTime = std::chrono::high_resolution_clock::now();
-        }
+    // public:
+    //     FunctionTimer(const std::string& name) : functionName(name) {
+    //         startTime = std::chrono::high_resolution_clock::now();
+    //     }
         
-        ~FunctionTimer() {
-            auto endTime = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = endTime - startTime;
-            totalTimes[functionName] += elapsed.count();
-            callCounts[functionName]++;
-        }
+    //     ~FunctionTimer() {
+    //         auto endTime = std::chrono::high_resolution_clock::now();
+    //         std::chrono::duration<double> elapsed = endTime - startTime;
+    //         totalTimes[functionName] += elapsed.count();
+    //         callCounts[functionName]++;
+    //     }
         
-        static void printStatistics() {
-            std::cout << "\n--- Function Timing Statistics ---\n";
-            double totalTime = 0.0;
+    //     static void printStatistics() {
+    //         std::cout << "\n--- Function Timing Statistics ---\n";
+    //         double totalTime = 0.0;
             
-            // First, calculate the total time spent in all functions
-            for (const auto& entry : totalTimes) {
-                if (entry.first == "buildInformedRRTStar") {
-                    totalTime = entry.second;
-                    break;
-                }
-            }
+    //         // First, calculate the total time spent in all functions
+    //         for (const auto& entry : totalTimes) {
+    //             if (entry.first == "buildInformedRRTStar") {
+    //                 totalTime = entry.second;
+    //                 break;
+    //             }
+    //         }
             
-            if (totalTime == 0.0 && !totalTimes.empty()) {
-                // If buildInformedRRTStar isn't found, use the sum of all function times
-                for (const auto& entry : totalTimes) {
-                    totalTime += entry.second;
-                }
-            }
+    //         if (totalTime == 0.0 && !totalTimes.empty()) {
+    //             // If buildInformedRRTStar isn't found, use the sum of all function times
+    //             for (const auto& entry : totalTimes) {
+    //                 totalTime += entry.second;
+    //             }
+    //         }
             
-            // Print statistics for each function
-            for (const auto& entry : totalTimes) {
-                const std::string& funcName = entry.first;
-                double funcTotalTime = entry.second;
-                int count = callCounts[funcName];
+    //         // Print statistics for each function
+    //         for (const auto& entry : totalTimes) {
+    //             const std::string& funcName = entry.first;
+    //             double funcTotalTime = entry.second;
+    //             int count = callCounts[funcName];
                 
-                std::cout << "Function: " << funcName << "\n";
-                std::cout << "  Total calls: " << count << "\n";
-                std::cout << "  Total time: " << funcTotalTime << " seconds\n";
-                std::cout << "  Average time per call: " << (funcTotalTime / count) << " seconds\n";
-                std::cout << "  Percentage of total: " << (funcTotalTime / totalTime * 100) << "%\n\n";
-            }
-        }
-    };
+    //             std::cout << "Function: " << funcName << "\n";
+    //             std::cout << "  Total calls: " << count << "\n";
+    //             std::cout << "  Total time: " << funcTotalTime << " seconds\n";
+    //             std::cout << "  Average time per call: " << (funcTotalTime / count) << " seconds\n";
+    //             std::cout << "  Percentage of total: " << (funcTotalTime / totalTime * 100) << "%\n\n";
+    //         }
+    //     }
+    // };
 
-    // Initialize static members
-    std::unordered_map<std::string, double> FunctionTimer::totalTimes;
-    std::unordered_map<std::string, int> FunctionTimer::callCounts;
 
     // Generate a random sample in the unit ball
     Node sampleUnitBall() {
-        FunctionTimer timer("sampleUnitBall");
+        GlobalFunctionTimer timer("sampleUnitBall");
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_real_distribution<> dist(-1.0, 1.0);
@@ -89,7 +86,7 @@ namespace rrt_informed {
     
     // Calculate the rotation matrix from the ellipsoid frame to the world frame
     std::vector<std::vector<double>> rotationToWorldFrame(const Node& start, const Node& goal) {
-        FunctionTimer timer("rotationToWorldFrame");
+        GlobalFunctionTimer timer("rotationToWorldFrame");
         // Get the direction of the transverse axis (from start to goal)
         double a1_x = goal.x - start.x;
         double a1_y = goal.y - start.y;
@@ -114,7 +111,7 @@ namespace rrt_informed {
     // Transform a point from the unit ball to the ellipsoid
     Node transformToEllipsoid(const Node& ball_sample, const EllipsoidSamplingDomain& domain,
                              const Node& start, const Node& goal) {
-        FunctionTimer timer("transformToEllipsoid");
+        GlobalFunctionTimer timer("transformToEllipsoid");
         // Get the rotation matrix
         auto C = rotationToWorldFrame(start, goal);
         
@@ -136,7 +133,7 @@ namespace rrt_informed {
     // Sample a state from the ellipsoidal domain or the entire state space
     Node sampleInformedSubset(const Node& start, const Node& goal, double cbest,
                               double xMin, double xMax, double yMin, double yMax) {
-        FunctionTimer timer("sampleInformedSubset");
+        GlobalFunctionTimer timer("sampleInformedSubset");
         // Create sampling domain
         EllipsoidSamplingDomain domain(start, goal, cbest);
         
@@ -180,7 +177,9 @@ std::vector<Node> buildInformedRRTStar(
     bool stopAtFirstSolution  // New parameter
 ) {
   
-    FunctionTimer timer("buildInformedRRTStar");
+    GlobalFunctionTimer::reset();
+    GlobalFunctionTimer timer("buildInformedRRTStar");
+    
     // Start timing
     std::chrono::time_point<std::chrono::high_resolution_clock> startTime = 
         std::chrono::high_resolution_clock::now();
@@ -263,9 +262,10 @@ std::vector<Node> buildInformedRRTStar(
                                     if (enableVisualization) {
                                         saveTreeToFile(nodes, treeFilename);
                                     }
-                                    FunctionTimer::printStatistics();
                                     
                                     std::cout << "Goal reached in " << i << " iterations. Stopping search." << std::endl;
+
+                                    GlobalFunctionTimer::printStatistics();
                                     
                                     // Extract and return path
                                     return extractPath(nodes, nodes.size() - 1);
@@ -284,22 +284,6 @@ std::vector<Node> buildInformedRRTStar(
             }
         }
         
-        // Periodically save the tree for visualization
-        if (enableVisualization && i % 100 == 0) {
-            saveTreeToFile(nodes, treeFilename);
-        }
-        
-        // Print timing statistics
-        FunctionTimer::printStatistics();
-        
-        // If goal was reached, extract and return the path
-        if (goalNodeIndex != -1) {
-            return extractPath(nodes, goalNodeIndex);
-        } else {
-            // If goal not reached, return empty path
-            std::cout << "Goal not reached within max iterations." << std::endl;
-            return std::vector<Node>();
-        }
     }
     
     // Save the final tree data if visualization is enabled
@@ -307,12 +291,12 @@ std::vector<Node> buildInformedRRTStar(
         saveTreeToFile(nodes, treeFilename);
     }
 
-    FunctionTimer::printStatistics();
-    
+    GlobalFunctionTimer::printStatistics();
+
     // If goal was reached, extract and return the path
-    if (goalNodeIndex != -1) {
+    if (goalNodeIndex != -1) {        
         return extractPath(nodes, goalNodeIndex);
-    } else {
+    } else {        
         // If goal not reached, return empty path
         std::cout << "Goal not reached within max iterations." << std::endl;
         return std::vector<Node>();
