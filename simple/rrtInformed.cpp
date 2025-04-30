@@ -263,6 +263,7 @@ std::vector<Node> buildInformedRRTStar(
                                     if (enableVisualization) {
                                         saveTreeToFile(nodes, treeFilename);
                                     }
+                                    FunctionTimer::printStatistics();
                                     
                                     std::cout << "Goal reached in " << i << " iterations. Stopping search." << std::endl;
                                     
@@ -305,6 +306,8 @@ std::vector<Node> buildInformedRRTStar(
     if (enableVisualization) {
         saveTreeToFile(nodes, treeFilename);
     }
+
+    FunctionTimer::printStatistics();
     
     // If goal was reached, extract and return the path
     if (goalNodeIndex != -1) {

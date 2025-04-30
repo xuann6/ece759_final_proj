@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <string>
 #include <iostream>
+#include <queue>
 
 namespace rrt_star {
 
@@ -196,7 +197,7 @@ namespace rrt_star {
                 const std::vector<std::vector<double>>& obstacles) {
         FunctionTimer timer("rewireTree");
         const Node& newNode = nodes[newNodeIdx];
-        
+        int nodeCount = nodes.size(); // Track actual number of nodes
         for (int nearIdx : nearIndices) {
             // Skip the parent of the new node
             if (nearIdx == nodes[newNodeIdx].parent || nearIdx >= nodeCount || nearIdx < 0) {
@@ -436,6 +437,9 @@ namespace rrt_star {
                                     {
                                         saveTreeToFile(nodes, treeFilename);
                                     }
+
+                                    // Print timing statistics
+                                    FunctionTimer::printStatistics();
 
                                     std::cout << "Goal reached in " << i << " iterations. Stopping search." << std::endl;
 
