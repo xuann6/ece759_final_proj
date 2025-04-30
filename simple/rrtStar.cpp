@@ -457,6 +457,7 @@ namespace rrt_star
             }
         }
 
+        GlobalFunctionTimer::printStatistics();
         // Save the tree data if visualization is enabled
         if (enableVisualization)
         {
@@ -464,7 +465,6 @@ namespace rrt_star
         }
 
         // Print timing statistics
-        GlobalFunctionTimer::printStatistics();
 
         // If goal was reached, extract and return the path
         if (goalNodeIndex != -1)
