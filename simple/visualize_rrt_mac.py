@@ -39,7 +39,7 @@ def save_frames_as_gif(ani, filename='rrt_animation', frames=100):
     
     return f'{filename}.gif'
 
-def visualize_rrt(tree_file="rrt_tree.csv"):
+def visualize_rrt(tree_file="rrt_star_tree.csv"):
     # Load the RRT tree data
     try:
         df = pd.read_csv(tree_file)
@@ -190,10 +190,15 @@ def visualize_rrt(tree_file="rrt_tree.csv"):
     ax1_final.text(goal_node.x + 0.03, goal_node.y, 'Goal', fontsize=10)
     
     # Plot all edges in the final tree
-    for _, node in df.iterrows():
+    for idx, node in df.iterrows():
         if node['parent_id'] >= 0:
             parent = df.iloc[int(node['parent_id'])]
-            ax1_final.plot([parent['x'], node['x']], [parent['y'], node['y']], 'b-', alpha=0.5)
+
+            was_rewired = node['parent_id'] > idx
+            color = 'black' if was_rewired else 'blue'
+
+            ax1_final.plot([parent['x'], node['x']], [parent['y'], node['y']], 
+                     color=color, alpha=0.5, linestyle='-')
     
     # Plot all nodes
     ax1_final.plot(df['x'], df['y'], 'bo', markersize=2, alpha=0.5)
@@ -488,4 +493,4 @@ def visualize_rrt_bi(tree_file="rrt_tree.csv"):
     
 if __name__ == "__main__":
     visualize_rrt()
-    # visualize_rrt_bi("rrt_bidirectional_tree.csv")
+    #visualize_rrt_bi("rrt_bidirect_tree.csv")

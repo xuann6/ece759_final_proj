@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include "TimerUtils.h"
 
 // Structure to represent a node in the RRT
 struct Node {
