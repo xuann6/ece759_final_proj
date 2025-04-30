@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <string>
 #include <iostream>
+#include <unordered_set>
 
 namespace bidirectional_rrt {
 
@@ -224,38 +225,95 @@ namespace bidirectional_rrt {
         return (dist <= threshold) && isPathClear(startTree[startIdx], goalTree[goalIdx], obstacles);
     }
     
-    // Merge two trees to create a complete path
-    std::vector<Node> mergeTrees(const std::vector<Node>& startTree, int startConnectIndex, 
-                               const std::vector<Node>& goalTree, int goalConnectIndex) {
-        GlobalFunctionTimer timer("mergeTrees");
-        std::vector<Node> mergedTree;
+
+std::vector<Node> mergeTrees(const std::vector<Node>& startTree, int startConnectIndex, 
+                           const std::vector<Node>& goalTree, int goalConnectIndex) {
+    GlobalFunctionTimer timer("mergeTrees");
+    std::vector<Node> mergedTree;
+
+    std::vector<int> startPath;
+    int currentIdx = startConnectIndex; // goalTree中的第0个节点是goal
+    std::vector<bool> startVisited(startTree.size(), false);  // 使用vector<bool>替代set
+    while (currentIdx != -1 && !startVisited[currentIdx]) {
+        startVisited[currentIdx] = true;
+        startPath.push_back(currentIdx);
         
-        // Add all nodes from start tree
-        for (const auto& node : startTree) {
-            mergedTree.push_back(node);
-        }
+        if (currentIdx == 0) break; // 到达连接点，停止
         
-        int startTreeSize = startTree.size();
-        
-        // Add all nodes from goal tree (with adjusted parent indices)
-        for (size_t i = 0; i < goalTree.size(); i++) {
-            Node adjustedNode = goalTree[i];
-            
-            // Adjust parent index for nodes from goal tree
-            if (adjustedNode.parent != -1) {
-                adjustedNode.parent = startTreeSize + adjustedNode.parent;
-            }
-            
-            mergedTree.push_back(adjustedNode);
-        }
-        
-        // Connect the trees by setting the parent of the first goal tree node
-        if (mergedTree.size() > startTreeSize && goalConnectIndex >= 0 && startConnectIndex >= 0) {
-            mergedTree[goalConnectIndex].parent = startConnectIndex;
-        }
-        
-        return mergedTree;
+        currentIdx = startTree[currentIdx].parent;
     }
+
+    // 3. 将goalPath反向添加到mergedTree（除了连接点）
+    int startSize = mergedTree.size();
+    
+    // 从连接点（不包括）到goal反向添加
+    for (int i = startPath.size() - 1; i >= 0 ; i--) {
+        Node node = startTree[startPath[i]];
+        
+        // 第一个添加的节点（连接点后面的节点）连接到startTree的连接点
+        if (i == startPath.size() - 1) {
+            node.parent = -1;
+        } else {
+            // 其他节点指向前一个添加的节点
+            node.parent = mergedTree.size() - 1;
+        }
+        
+        mergedTree.push_back(node);
+    }
+    
+    // 2. 从goalTree中提取路径 - 从goal到连接点
+    std::vector<int> goalPath;
+    currentIdx = goalConnectIndex; // goalTree中的第0个节点是goal
+    
+    // 找到从goal到连接点的路径
+    std::vector<bool> visited(goalTree.size(), false);  // 使用vector<bool>替代set
+    while (currentIdx != -1 && !visited[currentIdx]) {
+        visited[currentIdx] = true;
+        goalPath.push_back(currentIdx);
+        
+        if (currentIdx == 0) break; // 到达连接点，停止
+        
+        currentIdx = goalTree[currentIdx].parent;
+    }
+    
+    // 3. 将goalPath反向添加到mergedTree（除了连接点）
+    startSize = mergedTree.size();
+    
+    // 从连接点（不包括）到goal反向添加
+    for (int i = 0; i <= goalPath.size() - 1; i++) {
+        Node node = goalTree[goalPath[i]];
+        
+        // 第一个添加的节点（连接点后面的节点）连接到startTree的连接点
+        if (i == 0) {
+            node.parent = startConnectIndex;
+        } else {
+            // 其他节点指向前一个添加的节点
+            node.parent = mergedTree.size() - 1;
+        }
+        
+        mergedTree.push_back(node);
+    }
+    
+    return mergedTree;
+}
+
+    // 打印合并树的函数
+void printMergedTree(const std::vector<Node>& mergedTree) {
+    std::cout << "\n--- Merged Tree Structure ---\n";
+    std::cout << "Index\tX\tY\tParent\tCost\tTime\n";
+    std::cout << "------------------------------------------\n";
+    
+    for (size_t i = 0; i < mergedTree.size(); i++) {
+        const Node& node = mergedTree[i];
+        std::cout << i << "\t" 
+                  << node.x << "\t" 
+                  << node.y << "\t" 
+                  << node.parent << "\t"
+                  << node.cost << "\t"
+                  << node.time << std::endl;
+    }
+
+}
     
     // Extract the final path from merged trees
     std::vector<Node> extractBidirectionalPath(const std::vector<Node>& mergedTree, int startIndex, int goalIndex) {
@@ -281,6 +339,7 @@ namespace bidirectional_rrt {
         return path;
     }
     
+    // Main Bidirectional RRT algorithm
     // Main Bidirectional RRT algorithm
     std::vector<Node> buildBidirectionalRRT(
         const Node& start,
@@ -322,15 +381,17 @@ namespace bidirectional_rrt {
             if (extendTree(currentTree, randomNode, obstacles, stepSize)) {
                 // Try to connect the trees
                 if (tryConnect(currentTree, otherTree, obstacles, stepSize, connectThreshold)) {
-                    // Trees connected! Extract and return the path
+                    
                     auto closestPair = findClosestNodes(startTree, goalTree);
-                    
-                    
-                    // Merge trees
+                    int startConnectIdx = closestPair.first;
+                    int goalConnectIdx = closestPair.second;
+
                     std::vector<Node> mergedTree = mergeTrees(
-                        startTree, closestPair.first, 
-                        goalTree, closestPair.second
+                        startTree, startConnectIdx, 
+                        goalTree, goalConnectIdx
                     );
+
+                    printMergedTree(mergedTree);
 
                     Node connectingNode(startTree[closestPair.first].x, startTree[closestPair.first].y);
                     connectingNode.parent = closestPair.second;
@@ -344,13 +405,8 @@ namespace bidirectional_rrt {
                     
                     // Print timing statistics
                     GlobalFunctionTimer::printStatistics();
-                    
-                    // Extract and return the final path
-                    return extractBidirectionalPath(
-                        mergedTree, 
-                        0,  // Start is always the first node in the start tree
-                        startTree.size() + goalTree.size() - 1  // Goal is the last node in the merged tree
-                    );
+
+                    return mergedTree;
                 }
             }
             
@@ -360,13 +416,17 @@ namespace bidirectional_rrt {
             // Check direct connection periodically (every 10 iterations)
             if (iter % 10 == 0) {
                 if (isGoalReached(startTree, goalTree, obstacles, connectThreshold)) {
-                    auto closestPair = findClosestNodes(startTree, goalTree);
                     
-                    // Merge trees
+                    auto closestPair = findClosestNodes(startTree, goalTree);
+                    int startConnectIdx = closestPair.first;
+                    int goalConnectIdx = closestPair.second;
+
                     std::vector<Node> mergedTree = mergeTrees(
-                        startTree, closestPair.first, 
-                        goalTree, closestPair.second
+                        startTree, startConnectIdx, 
+                        goalTree, goalConnectIdx
                     );
+
+                    printMergedTree(mergedTree);
 
                     Node connectingNode(startTree[closestPair.first].x, startTree[closestPair.first].y);
                     connectingNode.parent = closestPair.second;
@@ -381,12 +441,7 @@ namespace bidirectional_rrt {
                     // Print timing statistics
                     GlobalFunctionTimer::printStatistics();
                     
-                    // Extract and return the final path
-                    return extractBidirectionalPath(
-                        mergedTree, 
-                        0,  // Start is always the first node in the start tree
-                        startTree.size() + goalTree.size() - 1  // Goal is the last node in the merged tree
-                    );
+                    return mergedTree;
                 }
             }
         }

@@ -153,7 +153,7 @@ int main()
 
         // Calculate path length
         double pathLengthRRTBi = 0.0;
-        for (int i = 1; i < pathRRT.size(); i++)
+        for (int i = 1; i < pathBidirectionalRRT.size(); i++)
         {
             pathLengthRRTBi += distance(pathBidirectionalRRT[i - 1], pathBidirectionalRRT[i]);
         }
