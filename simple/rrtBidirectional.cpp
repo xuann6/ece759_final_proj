@@ -4,11 +4,74 @@
 #include <fstream>
 #include <random>
 #include <chrono>
+#include <unordered_map>
+#include <string>
+#include <iostream>
 
 namespace bidirectional_rrt {
 
+    // Timer class to measure function execution times
+    class FunctionTimer {
+    private:
+        static std::unordered_map<std::string, double> totalTimes;
+        static std::unordered_map<std::string, int> callCounts;
+        
+        std::string functionName;
+        std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
+
+    public:
+        FunctionTimer(const std::string& name) : functionName(name) {
+            startTime = std::chrono::high_resolution_clock::now();
+        }
+        
+        ~FunctionTimer() {
+            auto endTime = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = endTime - startTime;
+            totalTimes[functionName] += elapsed.count();
+            callCounts[functionName]++;
+        }
+        
+        static void printStatistics() {
+            std::cout << "\n--- Function Timing Statistics ---\n";
+            double totalTime = 0.0;
+            
+            // First, calculate the total time spent in all functions
+            for (const auto& entry : totalTimes) {
+                if (entry.first == "buildBidirectionalRRT") {
+                    totalTime = entry.second;
+                    break;
+                }
+            }
+            
+            if (totalTime == 0.0 && !totalTimes.empty()) {
+                // If buildBidirectionalRRT isn't found, use the sum of all function times
+                for (const auto& entry : totalTimes) {
+                    totalTime += entry.second;
+                }
+            }
+            
+            // Print statistics for each function
+            for (const auto& entry : totalTimes) {
+                const std::string& funcName = entry.first;
+                double funcTotalTime = entry.second;
+                int count = callCounts[funcName];
+                
+                std::cout << "Function: " << funcName << "\n";
+                std::cout << "  Total calls: " << count << "\n";
+                std::cout << "  Total time: " << funcTotalTime << " seconds\n";
+                std::cout << "  Average time per call: " << (funcTotalTime / count) << " seconds\n";
+                std::cout << "  Percentage of total: " << (funcTotalTime / totalTime * 100) << "%\n\n";
+            }
+        }
+    };
+
+    // Initialize static members
+    std::unordered_map<std::string, double> FunctionTimer::totalTimes;
+    std::unordered_map<std::string, int> FunctionTimer::callCounts;
+
     // Find the closest pair of nodes between two trees
     std::pair<int, int> findClosestNodes(const std::vector<Node>& treeA, const std::vector<Node>& treeB) {
+        FunctionTimer timer("findClosestNodes");
         int closestA = -1;
         int closestB = -1;
         double minDist = std::numeric_limits<double>::max();
@@ -30,6 +93,7 @@ namespace bidirectional_rrt {
     // Check if path between two nodes is collision-free
     bool isPathClear(const Node& from, const Node& to, 
                      const std::vector<std::vector<double>>& obstacles) {
+        FunctionTimer timer("isPathClear");
         // For each obstacle, check if the path intersects with it
         for (const auto& obstacle : obstacles) {
             // Assuming obstacles are defined as circles with [x, y, radius]
@@ -78,6 +142,7 @@ namespace bidirectional_rrt {
     bool tryConnect(std::vector<Node>& treeA, std::vector<Node>& treeB, 
                     const std::vector<std::vector<double>>& obstacles,
                     double stepSize, double connectThreshold) {
+        FunctionTimer timer("tryConnect");
         // Find closest nodes between the trees
         auto closestPair = findClosestNodes(treeA, treeB);
         int idxA = closestPair.first;
@@ -118,6 +183,7 @@ namespace bidirectional_rrt {
     bool extendTree(std::vector<Node>& tree, const Node& randomNode, 
                     const std::vector<std::vector<double>>& obstacles,
                     double stepSize) {
+        FunctionTimer timer("extendTree");
         // Find nearest node in the tree
         int nearestIdx = findNearest(tree, randomNode);
         
@@ -144,6 +210,7 @@ namespace bidirectional_rrt {
     bool isGoalReached(const std::vector<Node>& startTree, const std::vector<Node>& goalTree, 
                        const std::vector<std::vector<double>>& obstacles,
                        double threshold) {
+        FunctionTimer timer("isGoalReached");
         auto closestPair = findClosestNodes(startTree, goalTree);
         int startIdx = closestPair.first;
         int goalIdx = closestPair.second;
@@ -159,6 +226,7 @@ namespace bidirectional_rrt {
     // Merge two trees to create a complete path
     std::vector<Node> mergeTrees(const std::vector<Node>& startTree, int startConnectIndex, 
                                const std::vector<Node>& goalTree, int goalConnectIndex) {
+        FunctionTimer timer("mergeTrees");
         std::vector<Node> mergedTree;
         
         // Add all nodes from start tree
@@ -190,6 +258,7 @@ namespace bidirectional_rrt {
     
     // Extract the final path from merged trees
     std::vector<Node> extractBidirectionalPath(const std::vector<Node>& mergedTree, int startIndex, int goalIndex) {
+        FunctionTimer timer("extractBidirectionalPath");
         // First extract the raw path by traversing from goal to start
         std::vector<int> pathIndices;
         int currentIdx = goalIndex;
@@ -226,6 +295,7 @@ namespace bidirectional_rrt {
         const std::string& treeFilename,
         bool enableVisualization
     ) {
+        FunctionTimer timer("buildBidirectionalRRT");
         // Initialize trees with their respective roots
         std::vector<Node> startTree = {start};
         std::vector<Node> goalTree = {goal};
@@ -270,6 +340,9 @@ namespace bidirectional_rrt {
                         saveTreesToFile(startTree, goalTree, treeFilename);
                     }
                     
+                    // Print timing statistics
+                    FunctionTimer::printStatistics();
+                    
                     // Extract and return the final path
                     return extractBidirectionalPath(
                         mergedTree, 
@@ -303,6 +376,9 @@ namespace bidirectional_rrt {
                         saveTreesToFile(startTree, goalTree, treeFilename);
                     }
                     
+                    // Print timing statistics
+                    FunctionTimer::printStatistics();
+                    
                     // Extract and return the final path
                     return extractBidirectionalPath(
                         mergedTree, 
@@ -318,6 +394,9 @@ namespace bidirectional_rrt {
             saveTreesToFile(startTree, goalTree, treeFilename);
         }
         
+        // Print timing statistics
+        FunctionTimer::printStatistics();
+        
         // Return partial path
         return buildPartialPath(startTree, goalTree, obstacles);
     }
@@ -328,6 +407,7 @@ namespace bidirectional_rrt {
         const std::vector<Node>& goalTree,
         const std::vector<std::vector<double>>& obstacles
     ) {
+        FunctionTimer timer("buildPartialPath");
         std::vector<Node> partialPath;
         
         // Find closest nodes between trees
@@ -366,6 +446,7 @@ namespace bidirectional_rrt {
         const std::vector<Node>& goalTree,
         const std::string& treeFilename
     ) {
+        FunctionTimer timer("saveTreesToFile");
         std::ofstream file(treeFilename);
         if (!file.is_open()) {
             std::cerr << "Unable to open file: " << treeFilename << std::endl;

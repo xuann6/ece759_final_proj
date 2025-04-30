@@ -5,13 +5,74 @@
 #include <algorithm>
 #include <fstream>
 #include <chrono>
-#include <queue>
+#include <unordered_map>
+#include <string>
+#include <iostream>
 
-namespace rrt_star
-{
+namespace rrt_star {
+
+    // Timer class to measure function execution times
+    class FunctionTimer {
+    private:
+        static std::unordered_map<std::string, double> totalTimes;
+        static std::unordered_map<std::string, int> callCounts;
+        
+        std::string functionName;
+        std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
+
+    public:
+        FunctionTimer(const std::string& name) : functionName(name) {
+            startTime = std::chrono::high_resolution_clock::now();
+        }
+        
+        ~FunctionTimer() {
+            auto endTime = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = endTime - startTime;
+            totalTimes[functionName] += elapsed.count();
+            callCounts[functionName]++;
+        }
+        
+        static void printStatistics() {
+            std::cout << "\n--- Function Timing Statistics ---\n";
+            double totalTime = 0.0;
+            
+            // First, calculate the total time spent in all functions
+            for (const auto& entry : totalTimes) {
+                if (entry.first == "buildRRTStar") {
+                    totalTime = entry.second;
+                    break;
+                }
+            }
+            
+            if (totalTime == 0.0 && !totalTimes.empty()) {
+                // If buildRRTStar isn't found, use the sum of all function times
+                for (const auto& entry : totalTimes) {
+                    totalTime += entry.second;
+                }
+            }
+            
+            // Print statistics for each function
+            for (const auto& entry : totalTimes) {
+                const std::string& funcName = entry.first;
+                double funcTotalTime = entry.second;
+                int count = callCounts[funcName];
+                
+                std::cout << "Function: " << funcName << "\n";
+                std::cout << "  Total calls: " << count << "\n";
+                std::cout << "  Total time: " << funcTotalTime << " seconds\n";
+                std::cout << "  Average time per call: " << (funcTotalTime / count) << " seconds\n";
+                std::cout << "  Percentage of total: " << (funcTotalTime / totalTime * 100) << "%\n\n";
+            }
+        }
+    };
+
+    // Initialize static members
+    std::unordered_map<std::string, double> FunctionTimer::totalTimes;
+    std::unordered_map<std::string, int> FunctionTimer::callCounts;
+
     // Find nodes within a certain radius
-    std::vector<int> findNearNodes(const std::vector<Node> &nodes, const Node &newNode, double radius)
-    {
+    std::vector<int> findNearNodes(const std::vector<Node>& nodes, const Node& newNode, double radius) {
+        FunctionTimer timer("findNearNodes");
         std::vector<int> nearIndices;
 
         for (int i = 0; i < nodes.size(); i++)
@@ -26,8 +87,8 @@ namespace rrt_star
     }
 
     // Check if the path between two nodes is collision-free
-    bool isPathClear(const Node &from, const Node &to, const std::vector<std::vector<double>> &obstacles)
-    {
+    bool isPathClear(const Node& from, const Node& to, const std::vector<std::vector<double>>& obstacles) {
+        FunctionTimer timer("isPathClear");
         // For each obstacle (represented as [x, y, radius])
         // std::cout << "Entered isPathClear." << std::endl;
 
@@ -100,13 +161,10 @@ namespace rrt_star
     }
 
     // Choose best parent for a new node (RRT* specific)
-    int chooseBestParent(const std::vector<Node> &nodes, const Node &newNode,
-                         const std::vector<int> &nearIndices,
-                         const std::vector<std::vector<double>> &obstacles)
-    {
-
-        // std::cout << "Entered chooseBestParent." << std::endl;
-
+    int chooseBestParent(const std::vector<Node>& nodes, const Node& newNode, 
+                        const std::vector<int>& nearIndices, 
+                        const std::vector<std::vector<double>>& obstacles) {
+        FunctionTimer timer("chooseBestParent");
         int bestParentIndex = -1;
         double bestCost = std::numeric_limits<double>::infinity();
 
@@ -132,136 +190,16 @@ namespace rrt_star
         return bestParentIndex;
     }
 
-    // Rewire the tree to optimize paths (RRT* specific) - non-recursive version
-    // void rewireTree(std::vector<Node> &nodes, int newNodeIdx,
-    //                 const std::vector<int> &nearIndices,
-    //                 const std::vector<std::vector<double>> &obstacles)
-    // {
-    //     const Node &newNode = nodes[newNodeIdx];
-
-    //     // First pass: directly rewire neighbors of the new node
-    //     for (int nearIdx : nearIndices)
-    //     {
-
-    //         // Skip the parent of the new node
-    //         if (nearIdx == nodes[newNodeIdx].parent)
-    //         {
-    //             continue;
-    //         }
-
-    //         // Skip the parent of the new node
-    //         if (nearIdx == nodes[newNodeIdx].parent)
-    //         {
-    //             continue;
-    //         }
-
-    //         // Check if the path is collision-free
-    //         if (isPathClear(newNode, nodes[nearIdx], obstacles))
-    //         {
-    //             // Calculate cost through the new node
-    //             double costThroughNew = newNode.cost + distance(newNode, nodes[nearIdx]);
-
-    //             // Rewire if the cost is lower
-    //             if (costThroughNew < nodes[nearIdx].cost)
-    //             {
-    //                 // Check for potential cycle
-    //                 int tempParent = newNodeIdx;
-    //                 bool wouldCreateCycle = false;
-    //                 while (tempParent != -1)
-    //                 {
-    //                     if (tempParent == nearIdx)
-    //                     {
-    //                         wouldCreateCycle = true;
-    //                         break;
-    //                     }
-    //                     tempParent = nodes[tempParent].parent;
-    //                 }
-
-    //                 if (!wouldCreateCycle)
-    //                 {
-    //                     nodes[nearIdx].cost = costThroughNew;
-    //                     nodes[nearIdx].parent = newNodeIdx;
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     // Second pass: non-recursive descendant cost update
-    //     // Keep track of nodes that have been updated
-    //     std::vector<bool> updated(nodes.size(), false);
-    //     std::queue<int> nodesToUpdate;
-
-    //     // Add all near nodes that were rewired to the queue
-    //     for (int nearIdx : nearIndices)
-    //     {
-    //         if (nearIdx != nodes[newNodeIdx].parent &&
-    //             nodes[nearIdx].parent == newNodeIdx)
-    //         {
-    //             nodesToUpdate.push(nearIdx);
-    //             updated[nearIdx] = true;
-    //         }
-    //     }
-
-    //     // Process queue until empty
-    //     while (!nodesToUpdate.empty())
-    //     {
-    //         int currentIdx = nodesToUpdate.front();
-    //         nodesToUpdate.pop();
-
-    //         // Find children of current node
-    //         for (size_t i = 0; i < nodes.size(); i++)
-    //         {
-    //             if (nodes[i].parent == currentIdx)
-    //             {
-    //                 // Update child cost
-    //                 double newCost = nodes[currentIdx].cost + distance(nodes[currentIdx], nodes[i]);
-
-    //                 // Only update if cost improves
-    //                 if (newCost < nodes[i].cost)
-    //                 {
-    //                     // Check for potential cycle before updating
-    //                     int tempParent = currentIdx;
-    //                     bool wouldCreateCycle = false;
-    //                     while (tempParent != -1)
-    //                     {
-    //                         if (tempParent == i)
-    //                         {
-    //                             wouldCreateCycle = true;
-    //                             break;
-    //                         }
-    //                         tempParent = nodes[tempParent].parent;
-    //                     }
-
-    //                     if (!wouldCreateCycle)
-    //                     {
-    //                         nodes[i].cost = newCost;
-
-    //                         // Add to queue if not already updated
-    //                         if (!updated[i])
-    //                         {
-    //                             nodesToUpdate.push(i);
-    //                             updated[i] = true;
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-    void rewireTree(std::vector<Node> &nodes, int newNodeIdx,
-                    const std::vector<int> &nearIndices,
-                    const std::vector<std::vector<double>> &obstacles)
-    {
-
-        const Node &newNode = nodes[newNodeIdx];
-        int nodeCount = nodes.size(); // Track actual number of nodes
-
-        // First pass: directly rewire neighbors of the new node
-        for (int nearIdx : nearIndices)
-        {
-            // Skip the parent of the new node or invalid indices
-            if (nearIdx == nodes[newNodeIdx].parent || nearIdx >= nodeCount || nearIdx < 0)
-            {
+    // Rewire the tree to optimize paths (RRT* specific)
+    void rewireTree(std::vector<Node>& nodes, int newNodeIdx, 
+                const std::vector<int>& nearIndices,
+                const std::vector<std::vector<double>>& obstacles) {
+        FunctionTimer timer("rewireTree");
+        const Node& newNode = nodes[newNodeIdx];
+        
+        for (int nearIdx : nearIndices) {
+            // Skip the parent of the new node
+            if (nearIdx == nodes[newNodeIdx].parent || nearIdx >= nodeCount || nearIdx < 0) {
                 continue;
             }
 
@@ -369,6 +307,7 @@ namespace rrt_star
         bool stopAtFirstSolution // New parameter
     )
     {
+        FunctionTimer timer("buildRRTStar");
         // Start timing for all runs
         std::chrono::time_point<std::chrono::high_resolution_clock> startTime = std::chrono::high_resolution_clock::now();
 
@@ -448,12 +387,10 @@ namespace rrt_star
                             if (totalCost < bestCost)
                             {
                                 bestCost = totalCost;
-
                                 // Create goal node
                                 Node goalNode = goal;
                                 goalNode.parent = newNodeIndex;
                                 goalNode.cost = totalCost;
-
                                 // Set time for goal node
                                 auto goalTime = std::chrono::high_resolution_clock::now();
                                 std::chrono::duration<double> goalElapsed = goalTime - startTime;
@@ -517,6 +454,9 @@ namespace rrt_star
         {
             saveTreeToFile(nodes, treeFilename);
         }
+      
+        // Print timing statistics
+        FunctionTimer::printStatistics();
 
         // If goal was reached, extract and return the path
         if (goalNodeIndex != -1)

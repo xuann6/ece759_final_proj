@@ -216,6 +216,5 @@ int main()
     {
         std::cout << "OpenMP Informed RRT* failed to find a path" << std::endl;
     }
-
     return 0;
 }
