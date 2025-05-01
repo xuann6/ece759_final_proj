@@ -12,13 +12,18 @@ int main()
 {
     // Configuration
     bool enableVisualization = false; // Set to false to disable visualization and improve performance
-    int numThreads = 4;               // Number of threads for OpenMP
+    int numThreads = 8;               // Number of threads for OpenMP
 
-    int iterations = 10000;
+    int iterations = 1000000;
 
     // Example usage
-    Node start(0.1, 0.1);
-    Node goal(0.9, 0.9);
+    Node start(10, 10);
+    Node goal(90, 90);
+
+    double xMin = 0;
+    double xMax = 0;
+    double yMin = 100;
+    double yMax = 100;
 
     double pathLengthRRT = 0.0;
     double pathLengthRRTOmp = 0.0;
@@ -34,34 +39,34 @@ int main()
     std::cout << "Using " << numThreads << " threads for parallel execution" << std::endl;
 
     // ===================== Standard RRT Test =====================
-    std::cout << "\n======== Standard RRT (Sequential) ========" << std::endl;
+    // std::cout << "\n======== Standard RRT (Sequential) ========" << std::endl;
 
-    // Start timer
-    auto startTime = std::chrono::high_resolution_clock::now();
+    // // Start timer
+    // auto startTime = std::chrono::high_resolution_clock::now();
 
-    // Run standard RRT
-    std::vector<Node> pathRRT = buildRRT(
-        start, goal, 0.1, 0.1, iterations, 0.0, 1.0, 0.0, 1.0, "rrt_tree.csv", enableVisualization);
+    // // Run standard RRT
+    // std::vector<Node> pathRRT = buildRRT(
+    //     start, goal, 0.1, 0.1, iterations, xMin, xMax, yMin, yMax, "rrt_tree.csv", enableVisualization);
 
-    // End timer
-    auto endTime = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedRRT = endTime - startTime;
+    // // End timer
+    // auto endTime = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> elapsedRRT = endTime - startTime;
 
-    if (!pathRRT.empty())
-    {
-        std::cout << "RRT path found with " << pathRRT.size() << " nodes in "
-                  << elapsedRRT.count() << " seconds" << std::endl;
+    // if (!pathRRT.empty())
+    // {
+    //     std::cout << "RRT path found with " << pathRRT.size() << " nodes in "
+    //               << elapsedRRT.count() << " seconds" << std::endl;
 
-        for (int i = 1; i < pathRRT.size(); i++)
-        {
-            pathLengthRRT += distance(pathRRT[i - 1], pathRRT[i]);
-        }
-        std::cout << "RRT path length: " << pathLengthRRT << std::endl;
-    }
-    else
-    {
-        std::cout << "RRT failed to find a path" << std::endl;
-    }
+    //     for (int i = 1; i < pathRRT.size(); i++)
+    //     {
+    //         pathLengthRRT += distance(pathRRT[i - 1], pathRRT[i]);
+    //     }
+    //     std::cout << "RRT path length: " << pathLengthRRT << std::endl;
+    // }
+    // else
+    // {
+    //     std::cout << "RRT failed to find a path" << std::endl;
+    // }
 
     // ===================== OpenMP RRT Test =====================
     std::cout << "\n======== Parallel RRT (OpenMP) ========" << std::endl;
@@ -71,7 +76,7 @@ int main()
 
     // Run OpenMP RRT
     std::vector<Node> pathRRTOmp = rrt_omp::buildRRTOmp(
-        start, goal, 0.1, 0.1, iterations, 0.0, 1.0, 0.0, 1.0, "rrt_omp_tree.csv", enableVisualization, numThreads);
+        start, goal, 0.1, 0.1, iterations, xMin, xMax, yMin, yMax, "rrt_omp_tree.csv", enableVisualization, numThreads);
 
     // End timer
     auto endTimeOmp = std::chrono::high_resolution_clock::now();
@@ -94,37 +99,37 @@ int main()
     }
 
     // ===================== Standard RRT* Test =====================
-    std::cout << "\n======== Standard RRT* (Sequential) ========" << std::endl;
+    // std::cout << "\n======== Standard RRT* (Sequential) ========" << std::endl;
 
-    // Start timer
-    auto startTimeRRTStar = std::chrono::high_resolution_clock::now();
+    // // Start timer
+    // auto startTimeRRTStar = std::chrono::high_resolution_clock::now();
 
-    // Dummy obstacles (empty vector for simplicity)
-    std::vector<std::vector<double>> obstacles;
+    // // Dummy obstacles (empty vector for simplicity)
+    // std::vector<std::vector<double>> obstacles;
 
-    // Run RRT*
-    std::vector<Node> pathRRTStar = rrt_star::buildRRTStar(
-        start, goal, obstacles, 0.1, 0.1, iterations, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_star_tree.csv", enableVisualization);
+    // // Run RRT*
+    // std::vector<Node> pathRRTStar = rrt_star::buildRRTStar(
+    //     start, goal, obstacles, 0.1, 0.1, iterations, 0.5, xMin, xMax, yMin, yMax, "rrt_star_tree.csv", enableVisualization);
 
-    // End timer
-    auto endTimeRRTStar = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedRRTStar = endTimeRRTStar - startTimeRRTStar;
+    // // End timer
+    // auto endTimeRRTStar = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> elapsedRRTStar = endTimeRRTStar - startTimeRRTStar;
 
-    if (!pathRRTStar.empty())
-    {
-        std::cout << "RRT* path found with " << pathRRTStar.size() << " nodes in "
-                  << elapsedRRTStar.count() << " seconds" << std::endl;
+    // if (!pathRRTStar.empty())
+    // {
+    //     std::cout << "RRT* path found with " << pathRRTStar.size() << " nodes in "
+    //               << elapsedRRTStar.count() << " seconds" << std::endl;
 
-        for (int i = 1; i < pathRRTStar.size(); i++)
-        {
-            pathLengthRRTStar += distance(pathRRTStar[i - 1], pathRRTStar[i]);
-        }
-        std::cout << "RRT* path length: " << pathLengthRRTStar << std::endl;
-    }
-    else
-    {
-        std::cout << "RRT* failed to find a path" << std::endl;
-    }
+    //     for (int i = 1; i < pathRRTStar.size(); i++)
+    //     {
+    //         pathLengthRRTStar += distance(pathRRTStar[i - 1], pathRRTStar[i]);
+    //     }
+    //     std::cout << "RRT* path length: " << pathLengthRRTStar << std::endl;
+    // }
+    // else
+    // {
+    //     std::cout << "RRT* failed to find a path" << std::endl;
+    // }
 
     // ===================== OpenMP RRT* Test =====================
     std::cout << "\n======== Parallel RRT* (OpenMP) ========" << std::endl;
@@ -134,7 +139,7 @@ int main()
 
     // Run OpenMP RRT*
     std::vector<Node> pathRRTStarOmp = rrt_star_omp::buildRRTStarOmp(
-        start, goal, obstacles, 0.1, 0.1, iterations, 0.5, 0.0, 1.0, 0.0, 1.0, "rrt_star_omp_tree.csv", enableVisualization, numThreads);
+        start, goal, obstacles, 0.1, 0.1, iterations, 0.5, xMin, xMax, yMin, yMax, "rrt_star_omp_tree.csv", enableVisualization, numThreads);
 
     // End timer
     auto endTimeRRTStarOmp = std::chrono::high_resolution_clock::now();
@@ -164,7 +169,7 @@ int main()
 
     // Run OpenMP RRT*
     std::vector<Node> pathRRTBiOmp = bidirectional_rrt_omp::buildBidirectionalRRT(
-        start, goal, obstacles, 0.1, 0.1, 5000, 0.0, 1.0, 0.0, 1.0, "rrt_bi_omp_tree.csv", enableVisualization, numThreads);
+        start, goal, obstacles, 0.1, 0.1, 5000, xMin, xMax, yMin, yMax, "rrt_bi_omp_tree.csv", enableVisualization, numThreads);
 
     // End timer
     auto endTimeRRTBiOmp = std::chrono::high_resolution_clock::now();
@@ -194,7 +199,7 @@ int main()
 
     // Run OpenMP Informed RRT*
     std::vector<Node> pathRRTInformedOmp = rrt_informed_omp::buildInformedRRTStarOmp(
-        start, goal, obstacles, 0.1, 0.1, iterations, 0.5, 0.0, 1.0, 0.0, 1.0,
+        start, goal, obstacles, 0.1, 0.1, iterations, 0.5, xMin, xMax, yMin, yMax,
         "rrt_informed_omp_tree.csv", enableVisualization, numThreads, true);
 
     // End timer
