@@ -148,7 +148,7 @@ int main()
     // treeFilename: File name to save the tree data for visualization
     // enableVisualization: Flag to enable or disable visualization
     std::vector<Node> pathBidirectionalRRT = bidirectional_rrt::buildBidirectionalRRT(
-        start, goal, obstacles, 0.1, 0.1, 10000, xMin, xMax, yMin, yMax, "rrt_bidirectional_tree.csv", enableVisualization);
+        start, goal, obstacles, 0.1, 0.1, iterations, xMin, xMax, yMin, yMax, "rrt_bidirectional_tree.csv", enableVisualization);
 
     // End timer
     auto bidirectionalRRTEndTime = std::chrono::high_resolution_clock::now();
