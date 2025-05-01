@@ -102,34 +102,34 @@ int main()
     }
 
     // ===================== Informed RRT* Test =====================
-    std::cout << "\n======== Informed RRT* ========" << std::endl;
+    // std::cout << "\n======== Informed RRT* ========" << std::endl;
 
-    auto startTimeInformedRRTStar = std::chrono::high_resolution_clock::now();
+    // auto startTimeInformedRRTStar = std::chrono::high_resolution_clock::now();
 
-    // Run Informed RRT*
-    std::vector<Node> pathInformedRRTStar = rrt_informed::buildInformedRRTStar(
-        start, goal, obstacles, 0.1, 0.1, iterations, 0.5, xMin, xMax, yMin, yMax, "rrt_informed_tree.csv", enableVisualization, true);
+    // // Run Informed RRT*
+    // std::vector<Node> pathInformedRRTStar = rrt_informed::buildInformedRRTStar(
+    //     start, goal, obstacles, 0.1, 0.1, iterations, 0.5, xMin, xMax, yMin, yMax, "rrt_informed_tree.csv", enableVisualization, true);
 
-    auto endTimeInformedRRTStar = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedInformedRRTStar = endTimeInformedRRTStar - startTimeInformedRRTStar;
+    // auto endTimeInformedRRTStar = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> elapsedInformedRRTStar = endTimeInformedRRTStar - startTimeInformedRRTStar;
 
-    if (!pathInformedRRTStar.empty())
-    {
-        std::cout << "Informed RRT* path found with " << pathInformedRRTStar.size() << " nodes in "
-                  << elapsedInformedRRTStar.count() << " seconds" << std::endl;
+    // if (!pathInformedRRTStar.empty())
+    // {
+    //     std::cout << "Informed RRT* path found with " << pathInformedRRTStar.size() << " nodes in "
+    //               << elapsedInformedRRTStar.count() << " seconds" << std::endl;
 
-        // Calculate path length
-        double pathLengthInformedRRTStar = 0.0;
-        for (int i = 1; i < pathInformedRRTStar.size(); i++)
-        {
-            pathLengthInformedRRTStar += distance(pathInformedRRTStar[i - 1], pathInformedRRTStar[i]);
-        }
-        std::cout << "Informed RRT* path length: " << pathLengthInformedRRTStar << std::endl;
-    }
-    else
-    {
-        std::cout << "Informed RRT* failed to find a path" << std::endl;
-    }
+    //     // Calculate path length
+    //     double pathLengthInformedRRTStar = 0.0;
+    //     for (int i = 1; i < pathInformedRRTStar.size(); i++)
+    //     {
+    //         pathLengthInformedRRTStar += distance(pathInformedRRTStar[i - 1], pathInformedRRTStar[i]);
+    //     }
+    //     std::cout << "Informed RRT* path length: " << pathLengthInformedRRTStar << std::endl;
+    // }
+    // else
+    // {
+    //     std::cout << "Informed RRT* failed to find a path" << std::endl;
+    // }
 
     // ===================== RRT Bidirectional Test =====================
     std::cout << "\n======== Bidirectional RRT ========" << std::endl;
