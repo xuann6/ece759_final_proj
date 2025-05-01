@@ -105,7 +105,7 @@ int main()
     // auto startTimeRRTStar = std::chrono::high_resolution_clock::now();
 
     // // Dummy obstacles (empty vector for simplicity)
-    // std::vector<std::vector<double>> obstacles;
+    std::vector<std::vector<double>> obstacles;
 
     // // Run RRT*
     // std::vector<Node> pathRRTStar = rrt_star::buildRRTStar(
