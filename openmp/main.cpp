@@ -169,7 +169,7 @@ int main()
 
     // Run OpenMP RRT*
     std::vector<Node> pathRRTBiOmp = bidirectional_rrt_omp::buildBidirectionalRRT(
-        start, goal, obstacles, 0.1, 0.1, 5000, xMin, xMax, yMin, yMax, "rrt_bi_omp_tree.csv", enableVisualization, numThreads);
+        start, goal, obstacles, 0.1, 0.1, iterations, xMin, xMax, yMin, yMax, "rrt_bi_omp_tree.csv", enableVisualization, numThreads);
 
     // End timer
     auto endTimeRRTBiOmp = std::chrono::high_resolution_clock::now();
