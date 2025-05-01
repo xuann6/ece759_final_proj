@@ -8,20 +8,20 @@
 int main()
 {
     // World size configuration
-    double worldWidth = 1.0;
-    double worldHeight = 1.0;
+    double worldWidth = 100.0;
+    double worldHeight = 100.0;
     double xMin = 0.0, xMax = worldWidth, yMin = 0.0, yMax = worldHeight;
     
     // Configuration
     bool enableVisualization = true; // Set to false to disable visualization and improve performance
 
     // Example usage - positions as percentages of world size
-    double startXPct = 0.1, startYPct = 0.5;
-    double goalXPct = 0.9, goalYPct = 0.5;
+    double startXPct = 0.1, startYPct = 0.1;
+    double goalXPct = 0.9, goalYPct = 0.9;
     
     Node start(startXPct * worldWidth, startYPct * worldHeight);
     Node goal(goalXPct * worldWidth, goalYPct * worldHeight);
-    int iterations = 1000;
+    int iterations = 1000000;
 
     std::cout << "Running RRT from (" << start.x << ", " << start.y << ") to ("
               << goal.x << ", " << goal.y << ")" << std::endl;

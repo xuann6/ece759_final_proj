@@ -391,7 +391,7 @@ void printMergedTree(const std::vector<Node>& mergedTree) {
                         goalTree, goalConnectIdx
                     );
 
-                    printMergedTree(mergedTree);
+                    // printMergedTree(mergedTree);
 
                     Node connectingNode(startTree[closestPair.first].x, startTree[closestPair.first].y);
                     connectingNode.parent = closestPair.second;
@@ -426,7 +426,7 @@ void printMergedTree(const std::vector<Node>& mergedTree) {
                         goalTree, goalConnectIdx
                     );
 
-                    printMergedTree(mergedTree);
+                    // printMergedTree(mergedTree);
 
                     Node connectingNode(startTree[closestPair.first].x, startTree[closestPair.first].y);
                     connectingNode.parent = closestPair.second;
