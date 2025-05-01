@@ -1,4 +1,4 @@
-#include "rrtObstaclesOmp.h"
+#include "rrtOmpWithObstacles.h"
 #include <cmath>
 #include <random>
 #include <limits>
@@ -7,7 +7,7 @@
 #include <chrono>
 #include <omp.h>
 
-namespace rrt_obstacles_omp {
+namespace rrt_omp_obstacles {
 
 // Calculate Euclidean distance between two nodes
 double distance(const Node& a, const Node& b) {
@@ -17,7 +17,13 @@ double distance(const Node& a, const Node& b) {
 // Find nearest node in the tree to the given point (parallel version)
 int findNearestParallel(const std::vector<Node>& nodes, const Node& point) {
     int nearest = 0;
-    double minDist = distance(nodes[0], point);
+    double minDist = std::numeric_limits<double>::max();
+    
+    if (!nodes.empty()) {
+        minDist = distance(nodes[0], point);
+    } else {
+        return -1; // Empty tree
+    }
     
     #pragma omp parallel
     {
@@ -25,7 +31,7 @@ int findNearestParallel(const std::vector<Node>& nodes, const Node& point) {
         double local_minDist = minDist;
         
         #pragma omp for nowait
-        for (size_t i = 1; i < nodes.size(); i++) {
+        for (size_t i = 0; i < nodes.size(); i++) {
             double dist = distance(nodes[i], point);
             if (dist < local_minDist) {
                 local_minDist = dist;
@@ -50,7 +56,7 @@ Node steer(const Node& nearest, const Node& random, double stepSize) {
     double dist = distance(nearest, random);
     
     if (dist <= stepSize) {
-        return random;
+        return Node(random.x, random.y);
     } else {
         double ratio = stepSize / dist;
         double newX = nearest.x + ratio * (random.x - nearest.x);
@@ -83,6 +89,7 @@ bool checkCollisionParallel(const Node& a, const Node& b, const std::vector<Obst
             if (obstacle.contains(x, y)) {
                 #pragma omp atomic write
                 collision = true;
+                break;
             }
         }
     }
@@ -102,30 +109,6 @@ std::vector<Node> extractPath(const std::vector<Node>& nodes, int goalIndex) {
     
     std::reverse(path.begin(), path.end());
     return path;
-}
-
-// Save the tree data to a file for visualization
-void saveTreeToFile(const std::vector<Node>& nodes, const std::string& filename) {
-    std::ofstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << filename << std::endl;
-        return;
-    }
-    
-    // Write header
-    file << "node_id,x,y,parent_id,time" << std::endl;
-    
-    // Write node data
-    for (size_t i = 0; i < nodes.size(); i++) {
-        file << i << ","
-             << nodes[i].x << ","
-             << nodes[i].y << ","
-             << nodes[i].parent << ","
-             << nodes[i].time << std::endl;
-    }
-    
-    file.close();
-    std::cout << "Tree data saved to " << filename << std::endl;
 }
 
 // Generate random obstacles in the environment
@@ -161,10 +144,8 @@ void saveObstaclesToFile(const std::vector<Obstacle>& obstacles, const std::stri
     
     // Write obstacle data
     for (const auto& obstacle : obstacles) {
-        file << obstacle.x << ","
-             << obstacle.y << ","
-             << obstacle.width << ","
-             << obstacle.height << std::endl;
+        file << obstacle.x << "," << obstacle.y << ","
+             << obstacle.width << "," << obstacle.height << std::endl;
     }
     
     file.close();
@@ -172,7 +153,7 @@ void saveObstaclesToFile(const std::vector<Obstacle>& obstacles, const std::stri
 }
 
 // Main RRT algorithm with obstacle avoidance (OpenMP version)
-std::vector<Node> buildRRTWithObstaclesOmp(
+std::vector<Node> buildRRTOmpWithObstacles(
     const Node& start,
     const Node& goal,
     const std::vector<Obstacle>& obstacles,
@@ -190,12 +171,9 @@ std::vector<Node> buildRRTWithObstaclesOmp(
     // Set the number of OpenMP threads
     omp_set_num_threads(numThreads);
     
-    // Start timing for all runs
-    std::chrono::time_point<std::chrono::high_resolution_clock> startTime = std::chrono::high_resolution_clock::now();
-    
     // Save obstacles to file if visualization is enabled
     if (enableVisualization) {
-        saveObstaclesToFile(obstacles, "rrt_obstacles_omp.csv");
+        saveObstaclesToFile(obstacles, "rrt_omp_obstacles.csv");
     }
     
     // Random number generation setup
@@ -218,74 +196,94 @@ std::vector<Node> buildRRTWithObstaclesOmp(
     
     // Initialize tree with start node
     std::vector<Node> nodes;
-    nodes.push_back(Node(start.x, start.y, -1, 0.0)); // Start node at time 0
+    nodes.push_back(start); // Start node at time 0
     
     // Main loop
     for (int i = 0; i < maxIterations; i++) {
-        // Get current time for this iteration
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = currentTime - startTime;
-        double timeSeconds = elapsed.count();
-        
-        // Generate random node (with small probability, sample the goal)
-        Node randomNode = (std::uniform_real_distribution<>(0, 1)(gen) < 0.1) ? 
+        // Generate random node (with 5% probability, sample the goal)
+        Node randomNode = (std::uniform_real_distribution<>(0, 1)(gen) < 0.05) ? 
                           goal : Node(xDist(gen), yDist(gen));
         
-        // Verify that the random node is not inside an obstacle
+        // Skip if random node is inside an obstacle
         bool insideObstacle = false;
-        
-        #pragma omp parallel for shared(insideObstacle)
-        for (size_t j = 0; j < obstacles.size(); j++) {
-            if (insideObstacle) continue; // Skip if already inside an obstacle
-            
-            if (obstacles[j].contains(randomNode.x, randomNode.y)) {
-                #pragma omp atomic write
+        for (const auto& obstacle : obstacles) {
+            if (obstacle.contains(randomNode.x, randomNode.y)) {
                 insideObstacle = true;
+                break;
             }
         }
-        
-        if (insideObstacle) {
-            continue; // Skip this random node if it's inside an obstacle
-        }
+        if (insideObstacle) continue;
         
         // Find nearest node in the tree
         int nearestIndex = findNearestParallel(nodes, randomNode);
-        const Node& nearestNode = nodes[nearestIndex];
+        if (nearestIndex < 0) continue; // Skip if tree is empty
         
-        // Steer towards random node with a maximum step size
-        Node newNode = steer(nearestNode, randomNode, stepSize);
-        newNode.parent = nearestIndex;
-        newNode.time = timeSeconds;
+        // Steer towards the random node
+        Node newNode = steer(nodes[nearestIndex], randomNode, stepSize);
+        newNode.time = static_cast<double>(i) / maxIterations; // Normalized time
         
-        // Check if the path to the new node collides with any obstacle
-        if (checkCollisionParallel(nearestNode, newNode, obstacles, numThreads)) {
-            continue; // Skip this new node if path collides with an obstacle
+        // Skip if new node is inside an obstacle
+        insideObstacle = false;
+        for (const auto& obstacle : obstacles) {
+            if (obstacle.contains(newNode.x, newNode.y)) {
+                insideObstacle = true;
+                break;
+            }
+        }
+        if (insideObstacle) continue;
+        
+        // Check for collision between nearest node and new node
+        if (checkCollisionParallel(nodes[nearestIndex], newNode, obstacles, numThreads)) {
+            continue; // Skip if there's a collision
         }
         
-        // Add new node to the tree
+        // Add the node to the tree
+        newNode.parent = nearestIndex;
         nodes.push_back(newNode);
         
         // Check if we reached the goal
         if (distance(newNode, goal) <= goalThreshold) {
-            nodes.push_back(Node(goal.x, goal.y, nodes.size() - 1, timeSeconds));
+            // Add the goal node to the tree
+            Node finalNode = goal;
+            finalNode.parent = nodes.size() - 1;
+            finalNode.time = 1.0; // Goal reached at final time
+            nodes.push_back(finalNode);
             
-            // Save the final tree for visualization if enabled
             if (enableVisualization) {
-                saveTreeToFile(nodes, treeFilename);
+                // Save the tree data to file for visualization
+                std::ofstream file(treeFilename);
+                if (file.is_open()) {
+                    file << "node_id,x,y,parent_id,time" << std::endl;
+                    for (size_t j = 0; j < nodes.size(); j++) {
+                        file << j << "," << nodes[j].x << "," << nodes[j].y << ","
+                             << nodes[j].parent << "," << nodes[j].time << std::endl;
+                    }
+                    file.close();
+                    std::cout << "Tree data saved to " << treeFilename << std::endl;
+                }
             }
             
-            // Extract the path from start to goal
             return extractPath(nodes, nodes.size() - 1);
         }
     }
     
-    // Save the final tree for visualization if enabled
+    std::cout << "Maximum number of iterations reached without finding a path." << std::endl;
+    
     if (enableVisualization) {
-        saveTreeToFile(nodes, treeFilename);
+        // Save the tree data to file for visualization even if no path was found
+        std::ofstream file(treeFilename);
+        if (file.is_open()) {
+            file << "node_id,x,y,parent_id,time" << std::endl;
+            for (size_t j = 0; j < nodes.size(); j++) {
+                file << j << "," << nodes[j].x << "," << nodes[j].y << ","
+                     << nodes[j].parent << "," << nodes[j].time << std::endl;
+            }
+            file.close();
+            std::cout << "Tree data saved to " << treeFilename << std::endl;
+        }
     }
     
-    // No path found within the maximum number of iterations
     return std::vector<Node>();
 }
 
-} // namespace rrt_obstacles_omp 
+} // namespace rrt_omp_obstacles 

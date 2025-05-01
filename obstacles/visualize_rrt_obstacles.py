@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.animation as animation
 import numpy as np
 import os
 
@@ -10,6 +11,8 @@ def read_tree_data(file_path):
         return None
     try:
         df = pd.read_csv(file_path)
+        # Convert scientific notation time values to float
+        df['time'] = df['time'].astype(float)
         return df
     except Exception as e:
         print(f"Error reading tree file: {e}")
@@ -71,33 +74,44 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
     ax.legend()
     
     if animate:
-        # Animate tree growth
-        max_time = tree_df['time'].max()
-        time_steps = np.linspace(0, max_time, 100)
+        # Get the unique time values for animation
+        time_values = sorted(tree_df['time'].unique())
+        print(f"Number of unique time steps: {len(time_values)}")
+        print(f"Time range: {time_values[0]} to {time_values[-1]}")
         
-        lines = []
+        # Create a collection for nodes
+        nodes_scatter = ax.scatter([], [], c='b', s=20, alpha=0.5)
         
-        for t in time_steps:
-            visible_df = tree_df[tree_df['time'] <= t]
+        # Animation update function
+        def update(frame):
+            # Get the current time value
+            if frame < len(time_values):
+                current_time = time_values[frame]
+            else:
+                current_time = time_values[-1]
             
-            # Clear previous lines
-            for line in lines:
+            # Get nodes up to the current time
+            visible_df = tree_df[tree_df['time'] <= current_time]
+            
+            # Clear previous frame's lines
+            for line in ax.lines[2:]:  # Keep start and goal points
                 line.remove()
-            lines = []
+            
+            # Update nodes
+            nodes_scatter.set_offsets(visible_df[['x', 'y']].values)
             
             # Draw edges
+            lines = []
             for _, node in visible_df.iterrows():
                 if node['parent_id'] >= 0:
                     parent_idx = int(node['parent_id'])
-                    parent = tree_df.iloc[parent_idx]
-                    line, = ax.plot([parent['x'], node['x']], [parent['y'], node['y']], 'b-', alpha=0.5)
-                    lines.append(line)
-            
-            # Draw nodes
-            nodes_scatter = ax.scatter(visible_df['x'], visible_df['y'], c='b', s=20, alpha=0.5)
-            lines.append(nodes_scatter)
+                    if parent_idx < len(tree_df):
+                        parent = tree_df.iloc[parent_idx]
+                        line = ax.plot([parent['x'], node['x']], [parent['y'], node['y']], 'b-', alpha=0.5)[0]
+                        lines.append(line)
             
             # Draw the path if the goal has been reached
+            path_line = None
             if goal_node['node_id'] in visible_df['node_id'].values:
                 path_nodes = []
                 current_id = goal_node['node_id']
@@ -110,21 +124,134 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
                 
                 # Extract x and y coordinates
                 path_x, path_y = zip(*path_nodes)
-                path_line, = ax.plot(path_x, path_y, 'g-', linewidth=2)
+                path_line = ax.plot(path_x, path_y, 'g-', linewidth=2)[0]
                 lines.append(path_line)
             
-            plt.title(f"{title} - Time: {t:.2f}s")
-            plt.pause(0.01)
+            ax.set_title(f"{title} - Time: {current_time:.8f}")
             
-            if save_animation:
-                plt.savefig(f"rrt_frame_{len(lines):04d}.png")
+            artists = lines + [nodes_scatter]
+            if path_line:
+                artists.append(path_line)
+            return artists
+        
+        # Create animation with appropriate number of frames
+        num_frames = min(100, len(time_values))
+        frame_indices = np.linspace(0, len(time_values) - 1, num_frames).astype(int)
+        
+        anim = animation.FuncAnimation(
+            fig, update, frames=frame_indices,
+            interval=50, blit=True, repeat=False
+        )
+        
+        # Always display the animation first
+        print("Displaying animation...")
+        plt.show()
+        
+        if save_animation:
+            # Save as MP4
+            writer = animation.FFMpegWriter(fps=20, bitrate=2000)
+            try:
+                print("Now saving animation to 'rrt_animation.mp4'...")
+                # Create a new figure for saving since the original window was closed
+                new_fig, new_ax = plt.subplots(figsize=(10, 10))
+                
+                # Set up the new figure exactly like the original
+                new_ax.set_xlim(0, 1)
+                new_ax.set_ylim(0, 1)
+                new_ax.set_xlabel('X')
+                new_ax.set_ylabel('Y')
+                new_ax.set_title(title)
+                new_ax.grid(True)
+                
+                # Draw obstacles if available
+                if obstacles_df is not None:
+                    for _, obstacle in obstacles_df.iterrows():
+                        rect = patches.Rectangle(
+                            (obstacle['x'], obstacle['y']), 
+                            obstacle['width'], 
+                            obstacle['height'],
+                            linewidth=1, 
+                            edgecolor='r', 
+                            facecolor='r', 
+                            alpha=0.3
+                        )
+                        new_ax.add_patch(rect)
+                
+                # Plot start and goal positions
+                new_ax.plot(start_x, start_y, 'go', markersize=10, label='Start')
+                new_ax.plot(goal_x, goal_y, 'ro', markersize=10, label='Goal')
+                new_ax.legend()
+                
+                # Initialize empty collections for the saving animation
+                new_nodes_scatter = new_ax.scatter([], [], c='b', s=20, alpha=0.5)
+                
+                # Define update function for the new animation
+                def new_update(frame):
+                    # Get the current time value
+                    if frame < len(time_values):
+                        current_time = time_values[frame]
+                    else:
+                        current_time = time_values[-1]
+                    
+                    # Get nodes up to the current time
+                    visible_df = tree_df[tree_df['time'] <= current_time]
+                    
+                    # Clear previous frame's lines
+                    for line in new_ax.lines[2:]:  # Keep start and goal points
+                        line.remove()
+                    
+                    # Update nodes
+                    new_nodes_scatter.set_offsets(visible_df[['x', 'y']].values)
+                    
+                    # Draw edges
+                    lines = []
+                    for _, node in visible_df.iterrows():
+                        if node['parent_id'] >= 0:
+                            parent_idx = int(node['parent_id'])
+                            if parent_idx < len(tree_df):
+                                parent = tree_df.iloc[parent_idx]
+                                line = new_ax.plot([parent['x'], node['x']], [parent['y'], node['y']], 'b-', alpha=0.5)[0]
+                                lines.append(line)
+                    
+                    # Draw the path if the goal has been reached
+                    path_line = None
+                    if goal_node['node_id'] in visible_df['node_id'].values:
+                        path_nodes = []
+                        current_id = goal_node['node_id']
+                        
+                        while current_id != -1:
+                            current_node = tree_df[tree_df['node_id'] == current_id].iloc[0]
+                            path_nodes.append((current_node['x'], current_node['y']))
+                            current_id = current_node['parent_id']
+                        
+                        path_x, path_y = zip(*path_nodes)
+                        path_line = new_ax.plot(path_x, path_y, 'g-', linewidth=2)[0]
+                        lines.append(path_line)
+                    
+                    new_ax.set_title(f"{title} - Time: {current_time:.8f}")
+                    
+                    artists = lines + [new_nodes_scatter]
+                    if path_line:
+                        artists.append(path_line)
+                    return artists
+                
+                new_anim = animation.FuncAnimation(
+                    new_fig, new_update, frames=frame_indices,
+                    interval=50, blit=True, repeat=False
+                )
+                new_anim.save('rrt_animation.mp4', writer=writer)
+                print("Animation saved successfully!")
+                plt.close(new_fig)
+            except Exception as e:
+                print(f"Error saving animation: {e}")
     else:
         # Draw the final tree
         for _, node in tree_df.iterrows():
             if node['parent_id'] >= 0:
                 parent_idx = int(node['parent_id'])
-                parent = tree_df.iloc[parent_idx]
-                ax.plot([parent['x'], node['x']], [parent['y'], node['y']], 'b-', alpha=0.5)
+                if parent_idx < len(tree_df):
+                    parent = tree_df.iloc[parent_idx]
+                    ax.plot([parent['x'], node['x']], [parent['y'], node['y']], 'b-', alpha=0.5)
         
         # Draw nodes
         ax.scatter(tree_df['x'], tree_df['y'], c='b', s=20, alpha=0.5)
@@ -145,13 +272,13 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
             path_x, path_y = zip(*path_nodes)
             ax.plot(path_x, path_y, 'g-', linewidth=2, label='Path')
             ax.legend()
-    
-    plt.show()
+        
+        plt.show()
 
 def main():
     # File paths for the RRT data
-    tree_file = "rrt_obstacles_tree.csv"
-    obstacles_file = "rrt_obstacles.csv"
+    tree_file = "rrt_omp_obstacles_tree.csv"
+    obstacles_file = "rrt_omp_obstacles.csv"
     
     # Read the data
     tree_df = read_tree_data(tree_file)
@@ -164,7 +291,7 @@ def main():
             print(f"Obstacles data loaded with {len(obstacles_df)} obstacles.")
         
         # Visualize the tree with obstacles
-        visualize_tree(tree_df, obstacles_df, title="RRT with Obstacles", animate=True, save_animation=False)
+        visualize_tree(tree_df, obstacles_df, title="RRT with Obstacles", animate=True, save_animation=True)
 
 if __name__ == "__main__":
     main() 

@@ -106,21 +106,17 @@ std::vector<Obstacle> generateObstacles(double worldWidth, double worldHeight) {
     std::vector<Obstacle> obstacles;
     
     // Create two rectangular obstacles with fixed width (1/10th of world width)
-    // and random heights
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> heightDist(0.1, 0.7); // Random height between 10% and 70% of world height
-    
+    // and fixed height (60% of world height)
     double obstacleWidth = worldWidth / 10.0;
     
     // First obstacle at 1/3 of the world width
     double x1 = worldWidth / 3.0 - obstacleWidth / 2.0;
-    double height1 = heightDist(gen) * worldHeight;
+    double height1 = 0.6 * worldHeight;
     obstacles.push_back(Obstacle(x1, 0, obstacleWidth, height1));
     
     // Second obstacle at 2/3 of the world width
     double x2 = 2.0 * worldWidth / 3.0 - obstacleWidth / 2.0;
-    double height2 = heightDist(gen) * worldHeight;
+    double height2 = 0.6 * worldHeight;
     obstacles.push_back(Obstacle(x2, worldHeight - height2, obstacleWidth, height2));
     
     return obstacles;
