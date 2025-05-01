@@ -25,11 +25,11 @@ int findNearestParallel(const std::vector<Node>& nodes, const Node& point) {
         double local_minDist = minDist;
         
         #pragma omp for nowait
-        for (int i = 1; i < nodes.size(); i++) {
+        for (size_t i = 1; i < nodes.size(); i++) {
             double dist = distance(nodes[i], point);
             if (dist < local_minDist) {
                 local_minDist = dist;
-                local_nearest = i;
+                local_nearest = static_cast<int>(i);
             }
         }
         
@@ -83,9 +83,6 @@ bool checkCollisionParallel(const Node& a, const Node& b, const std::vector<Obst
             if (obstacle.contains(x, y)) {
                 #pragma omp atomic write
                 collision = true;
-                
-                #pragma omp cancel for
-                break;
             }
         }
     }
@@ -119,7 +116,7 @@ void saveTreeToFile(const std::vector<Node>& nodes, const std::string& filename)
     file << "node_id,x,y,parent_id,time" << std::endl;
     
     // Write node data
-    for (int i = 0; i < nodes.size(); i++) {
+    for (size_t i = 0; i < nodes.size(); i++) {
         file << i << ","
              << nodes[i].x << ","
              << nodes[i].y << ","
@@ -135,22 +132,17 @@ void saveTreeToFile(const std::vector<Node>& nodes, const std::string& filename)
 std::vector<Obstacle> generateObstacles(double worldWidth, double worldHeight) {
     std::vector<Obstacle> obstacles;
     
-    // Create two rectangular obstacles with fixed width (1/10th of world width)
-    // and random heights
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> heightDist(0.1, 0.7); // Random height between 10% and 70% of world height
-    
+    // Create two rectangular obstacles with fixed width and height
     double obstacleWidth = worldWidth / 10.0;
     
-    // First obstacle at 1/3 of the world width
+    // First obstacle at 1/3 of the world width with fixed height (40% of world height)
     double x1 = worldWidth / 3.0 - obstacleWidth / 2.0;
-    double height1 = heightDist(gen) * worldHeight;
+    double height1 = 0.6 * worldHeight;
     obstacles.push_back(Obstacle(x1, 0, obstacleWidth, height1));
     
-    // Second obstacle at 2/3 of the world width
+    // Second obstacle at 2/3 of the world width with fixed height (40% of world height)
     double x2 = 2.0 * worldWidth / 3.0 - obstacleWidth / 2.0;
-    double height2 = heightDist(gen) * worldHeight;
+    double height2 = 0.6 * worldHeight;
     obstacles.push_back(Obstacle(x2, worldHeight - height2, obstacleWidth, height2));
     
     return obstacles;
@@ -243,15 +235,12 @@ std::vector<Node> buildRRTWithObstaclesOmp(
         bool insideObstacle = false;
         
         #pragma omp parallel for shared(insideObstacle)
-        for (int j = 0; j < obstacles.size(); j++) {
+        for (size_t j = 0; j < obstacles.size(); j++) {
             if (insideObstacle) continue; // Skip if already inside an obstacle
             
             if (obstacles[j].contains(randomNode.x, randomNode.y)) {
                 #pragma omp atomic write
                 insideObstacle = true;
-                
-                #pragma omp cancel for
-                break;
             }
         }
         
