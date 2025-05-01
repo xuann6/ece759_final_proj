@@ -246,6 +246,8 @@ namespace rrt_star_omp {
                                 if (goalNodeIndex == -1) {
                                     nodes.push_back(goalNode);
                                     goalNodeIndex = nodes.size() - 1;
+                                    
+                                    return extractPath(nodes, goalNodeIndex);
                                 } else {
                                     // Replace existing goal node with better path
                                     nodes[goalNodeIndex] = goalNode;

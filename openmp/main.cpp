@@ -195,7 +195,7 @@ int main()
     // Run OpenMP Informed RRT*
     std::vector<Node> pathRRTInformedOmp = rrt_informed_omp::buildInformedRRTStarOmp(
         start, goal, obstacles, 0.1, 0.1, iterations, 0.5, 0.0, 1.0, 0.0, 1.0,
-        "rrt_informed_omp_tree.csv", enableVisualization, numThreads, false);
+        "rrt_informed_omp_tree.csv", enableVisualization, numThreads, true);
 
     // End timer
     auto endTimeRRTInformedOmp = std::chrono::high_resolution_clock::now();
