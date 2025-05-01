@@ -21,8 +21,8 @@ int main()
     Node goal(90, 90);
 
     double xMin = 0;
-    double xMax = 0;
-    double yMin = 100;
+    double xMax = 100;
+    double yMin = 0;
     double yMax = 100;
 
     double pathLengthRRT = 0.0;
