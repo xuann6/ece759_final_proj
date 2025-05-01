@@ -51,7 +51,8 @@ std::vector<Node> extractPath(const std::vector<Node>& nodes, int goalIndex);
 std::vector<Obstacle> generateObstacles(double worldWidth, double worldHeight);
 
 // Save obstacles to a file for visualization
-void saveObstaclesToFile(const std::vector<Obstacle>& obstacles, const std::string& filename);
+void saveObstaclesToFile(const std::vector<Obstacle>& obstacles, const std::string& filename, 
+                         double worldWidth = 0.0, double worldHeight = 0.0);
 
 // Main RRT algorithm with obstacle avoidance (OpenMP version)
 std::vector<Node> buildRRTOmpWithObstacles(

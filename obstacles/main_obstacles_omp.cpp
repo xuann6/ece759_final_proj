@@ -25,8 +25,8 @@ void getProblemSpecs(int argc, char* argv[],
                     bool& runBidirectionalRRT) {
     // Default values
     numThreads = 4;
-    worldWidth = 1.0;
-    worldHeight = 1.0;
+    worldWidth = 10.0;
+    worldHeight = 10.0;
     enableVisualization = true;
     stepSize = 0.05;
     goalThreshold = 0.05;
@@ -94,10 +94,10 @@ void getProblemSpecs(int argc, char* argv[],
     }
     
     // If start/goal weren't explicitly provided, set them relative to world size
-    if (startX <= 0.0) startX = 0.1 * worldWidth;
-    if (startY <= 0.0) startY = 0.1 * worldHeight;
-    if (goalX <= 0.0) goalX = 0.9 * worldWidth;
-    if (goalY <= 0.0) goalY = 0.9 * worldHeight;
+    startX = 0.1 * worldWidth;
+    startY = 0.1 * worldHeight;
+    goalX = 0.9 * worldWidth;
+    goalY = 0.9 * worldHeight;
 }
 
 // Function to print algorithm performance results

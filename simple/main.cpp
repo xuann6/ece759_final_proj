@@ -7,17 +7,25 @@
 
 int main()
 {
+    // World size configuration
+    double worldWidth = 1.0;
+    double worldHeight = 1.0;
+    double xMin = 0.0, xMax = worldWidth, yMin = 0.0, yMax = worldHeight;
+    
     // Configuration
     bool enableVisualization = true; // Set to false to disable visualization and improve performance
 
-    // Example usage
-    Node start(0.5, 0.5);
-    Node goal(0.9, 0.9);
-    double xMin = 0.0, xMax = 1.0, yMin = 0.0, yMax = 1.0;
+    // Example usage - positions as percentages of world size
+    double startXPct = 0.1, startYPct = 0.5;
+    double goalXPct = 0.9, goalYPct = 0.5;
+    
+    Node start(startXPct * worldWidth, startYPct * worldHeight);
+    Node goal(goalXPct * worldWidth, goalYPct * worldHeight);
     int iterations = 1000;
 
     std::cout << "Running RRT from (" << start.x << ", " << start.y << ") to ("
               << goal.x << ", " << goal.y << ")" << std::endl;
+    std::cout << "World size: " << worldWidth << " x " << worldHeight << std::endl;
 
     std::cout << "Visualization is " << (enableVisualization ? "enabled" : "disabled") << std::endl;
 
@@ -140,7 +148,7 @@ int main()
     // treeFilename: File name to save the tree data for visualization
     // enableVisualization: Flag to enable or disable visualization
     std::vector<Node> pathBidirectionalRRT = bidirectional_rrt::buildBidirectionalRRT(
-        start, goal, obstacles, 0.1, 0.1, 10000, 0.0, 1.0, 0.0, 1.0, "rrt_bidirectional_tree.csv", enableVisualization);
+        start, goal, obstacles, 0.1, 0.1, 10000, xMin, xMax, yMin, yMax, "rrt_bidirectional_tree.csv", enableVisualization);
 
     // End timer
     auto bidirectionalRRTEndTime = std::chrono::high_resolution_clock::now();

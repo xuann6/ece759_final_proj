@@ -23,8 +23,17 @@ def read_obstacles_data(file_path):
         print(f"Obstacles file {file_path} not found.")
         return None
     try:
-        df = pd.read_csv(file_path)
-        return df
+        # Read the first two lines to get world dimensions
+        world_dims = pd.read_csv(file_path, nrows=1)
+        
+        # Read the rest of the file starting from line 3 (after the header for obstacles)
+        obstacles = pd.read_csv(file_path, skiprows=2)
+        
+        # Combine world dimensions with obstacles
+        # This ensures we keep the world_width and world_height in the dataframe
+        result = pd.concat([world_dims, obstacles], ignore_index=True)
+        
+        return result
     except Exception as e:
         print(f"Error reading obstacles file: {e}")
         return None
@@ -36,9 +45,16 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
     # Create a figure and axes
     fig, ax = plt.subplots(figsize=(10, 10))
     
-    # Set axis limits and labels
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
+    # Set axis limits and labels based on world dimensions from obstacles file
+    world_width = 1
+    world_height = 1
+    if obstacles_df is not None and 'world_width' in obstacles_df.columns and 'world_height' in obstacles_df.columns:
+        # Get world dimensions from the first row
+        world_width = obstacles_df.loc[0, 'world_width']
+        world_height = obstacles_df.loc[0, 'world_height']
+    
+    ax.set_xlim(0, world_width)
+    ax.set_ylim(0, world_height)
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_title(title)
@@ -46,17 +62,19 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
     
     # Draw obstacles if available
     if obstacles_df is not None:
-        for _, obstacle in obstacles_df.iterrows():
-            rect = patches.Rectangle(
-                (obstacle['x'], obstacle['y']), 
-                obstacle['width'], 
-                obstacle['height'],
-                linewidth=1, 
-                edgecolor='r', 
-                facecolor='r', 
-                alpha=0.3
-            )
-            ax.add_patch(rect)
+        for idx, obstacle in obstacles_df.iterrows():
+            # Skip rows containing world dimensions
+            if 'width' in obstacle and 'height' in obstacle and 'x' in obstacle and 'y' in obstacle:
+                rect = patches.Rectangle(
+                    (obstacle['x'], obstacle['y']), 
+                    obstacle['width'], 
+                    obstacle['height'],
+                    linewidth=1, 
+                    edgecolor='r', 
+                    facecolor='r', 
+                    alpha=0.3
+                )
+                ax.add_patch(rect)
     
     # Extract start and goal nodes
     start_node = tree_df.iloc[0]
@@ -76,19 +94,26 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
     if animate:
         # Get the unique time values for animation
         time_values = sorted(tree_df['time'].unique())
+        # Convert time values to milliseconds for display
+        time_ms = [t * 1000 for t in time_values]
         print(f"Number of unique time steps: {len(time_values)}")
-        print(f"Time range: {time_values[0]} to {time_values[-1]}")
+        print(f"Time range: {time_ms[0]:.2f} ms to {time_ms[-1]:.2f} ms")
         
         # Create a collection for nodes
         nodes_scatter = ax.scatter([], [], c='b', s=20, alpha=0.5)
+        
+        # Create a text object for the time display
+        time_text = ax.text(0.02, 0.98, '', transform=ax.transAxes, fontsize=12)
         
         # Animation update function
         def update(frame):
             # Get the current time value
             if frame < len(time_values):
                 current_time = time_values[frame]
+                current_time_ms = time_ms[frame]
             else:
                 current_time = time_values[-1]
+                current_time_ms = time_ms[-1]
             
             # Get nodes up to the current time
             visible_df = tree_df[tree_df['time'] <= current_time]
@@ -127,12 +152,11 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
                 path_line = ax.plot(path_x, path_y, 'g-', linewidth=2)[0]
                 lines.append(path_line)
             
-            ax.set_title(f"{title} - Time: {current_time:.8f}")
+            # Update the title with current time
+            ax.set_title(f"{title} - Time: {current_time_ms:.2f} ms")
+            time_text.set_text(f"Time: {current_time_ms:.2f} ms")
             
-            artists = lines + [nodes_scatter]
-            if path_line:
-                artists.append(path_line)
-            return artists
+            return [nodes_scatter, time_text] + lines
         
         # Create animation with appropriate number of frames
         num_frames = min(100, len(time_values))
@@ -140,7 +164,7 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
         
         anim = animation.FuncAnimation(
             fig, update, frames=frame_indices,
-            interval=50, blit=True, repeat=False
+            interval=50, blit=False, repeat=False
         )
         
         # Always display the animation first
@@ -156,8 +180,8 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
                 new_fig, new_ax = plt.subplots(figsize=(10, 10))
                 
                 # Set up the new figure exactly like the original
-                new_ax.set_xlim(0, 1)
-                new_ax.set_ylim(0, 1)
+                new_ax.set_xlim(0, world_width)
+                new_ax.set_ylim(0, world_height)
                 new_ax.set_xlabel('X')
                 new_ax.set_ylabel('Y')
                 new_ax.set_title(title)
@@ -165,17 +189,19 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
                 
                 # Draw obstacles if available
                 if obstacles_df is not None:
-                    for _, obstacle in obstacles_df.iterrows():
-                        rect = patches.Rectangle(
-                            (obstacle['x'], obstacle['y']), 
-                            obstacle['width'], 
-                            obstacle['height'],
-                            linewidth=1, 
-                            edgecolor='r', 
-                            facecolor='r', 
-                            alpha=0.3
-                        )
-                        new_ax.add_patch(rect)
+                    for idx, obstacle in obstacles_df.iterrows():
+                        # Skip rows containing world dimensions
+                        if 'width' in obstacle and 'height' in obstacle and 'x' in obstacle and 'y' in obstacle:
+                            rect = patches.Rectangle(
+                                (obstacle['x'], obstacle['y']), 
+                                obstacle['width'], 
+                                obstacle['height'],
+                                linewidth=1, 
+                                edgecolor='r', 
+                                facecolor='r', 
+                                alpha=0.3
+                            )
+                            new_ax.add_patch(rect)
                 
                 # Plot start and goal positions
                 new_ax.plot(start_x, start_y, 'go', markersize=10, label='Start')
@@ -184,14 +210,17 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
                 
                 # Initialize empty collections for the saving animation
                 new_nodes_scatter = new_ax.scatter([], [], c='b', s=20, alpha=0.5)
+                new_time_text = new_ax.text(0.02, 0.98, '', transform=new_ax.transAxes, fontsize=12)
                 
                 # Define update function for the new animation
                 def new_update(frame):
                     # Get the current time value
                     if frame < len(time_values):
                         current_time = time_values[frame]
+                        current_time_ms = time_ms[frame]
                     else:
                         current_time = time_values[-1]
+                        current_time_ms = time_ms[-1]
                     
                     # Get nodes up to the current time
                     visible_df = tree_df[tree_df['time'] <= current_time]
@@ -228,16 +257,15 @@ def visualize_tree(tree_df, obstacles_df=None, title="RRT Visualization", animat
                         path_line = new_ax.plot(path_x, path_y, 'g-', linewidth=2)[0]
                         lines.append(path_line)
                     
-                    new_ax.set_title(f"{title} - Time: {current_time:.8f}")
+                    # Update the title with current time
+                    new_ax.set_title(f"{title} - Time: {current_time_ms:.2f} ms")
+                    new_time_text.set_text(f"Time: {current_time_ms:.2f} ms")
                     
-                    artists = lines + [new_nodes_scatter]
-                    if path_line:
-                        artists.append(path_line)
-                    return artists
+                    return [new_nodes_scatter, new_time_text] + lines
                 
                 new_anim = animation.FuncAnimation(
                     new_fig, new_update, frames=frame_indices,
-                    interval=50, blit=True, repeat=False
+                    interval=50, blit=False, repeat=False
                 )
                 new_anim.save('rrt_animation.mp4', writer=writer)
                 print("Animation saved successfully!")
@@ -284,14 +312,17 @@ def main():
     tree_df = read_tree_data(tree_file)
     obstacles_df = read_obstacles_data(obstacles_file)
     
+    # Set to True to save the animation, False to only display it
+    save_animation = False
+    
     if tree_df is not None:
         print(f"Tree data loaded with {len(tree_df)} nodes.")
         
         if obstacles_df is not None:
-            print(f"Obstacles data loaded with {len(obstacles_df)} obstacles.")
+            print(f"Obstacles data loaded with {len(obstacles_df) - 1} obstacles.")
         
         # Visualize the tree with obstacles
-        visualize_tree(tree_df, obstacles_df, title="RRT with Obstacles", animate=True, save_animation=True)
+        visualize_tree(tree_df, obstacles_df, title="RRT with Obstacles", animate=True, save_animation=save_animation)
 
 if __name__ == "__main__":
     main() 

@@ -132,14 +132,19 @@ std::vector<Obstacle> generateObstacles(double worldWidth, double worldHeight) {
 }
 
 // Save obstacles to a file for visualization
-void saveObstaclesToFile(const std::vector<Obstacle>& obstacles, const std::string& filename) {
+void saveObstaclesToFile(const std::vector<Obstacle>& obstacles, const std::string& filename, 
+                         double worldWidth, double worldHeight) {
     std::ofstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << filename << std::endl;
         return;
     }
     
-    // Write header
+    // Write world dimensions as the first line
+    file << "world_width,world_height" << std::endl;
+    file << worldWidth << "," << worldHeight << std::endl;
+    
+    // Write header for obstacles
     file << "x,y,width,height" << std::endl;
     
     // Write obstacle data
@@ -173,7 +178,7 @@ std::vector<Node> buildRRTOmpWithObstacles(
     
     // Save obstacles to file if visualization is enabled
     if (enableVisualization) {
-        saveObstaclesToFile(obstacles, "rrt_omp_obstacles.csv");
+        saveObstaclesToFile(obstacles, "rrt_omp_obstacles.csv", xMax - xMin, yMax - yMin);
     }
     
     // Random number generation setup

@@ -94,13 +94,16 @@ void runBenchmark(const std::string& name, Func&& algorithm) {
 int main(int argc, char* argv[]) {
     // Configuration
     bool enableVisualization = true;
-    int maxIterations = 5000;       // Default iterations
+    int maxIterations = 1000000;       // Default iterations
     int numThreads = 256;           // Default number of CUDA threads
     bool runAll = true;             // Run all algorithms by default
     bool runStandard = false;       // Individual algorithm flags
     bool runStar = false;
     bool runBidirectional = false;
     bool runInformed = false;
+    double worldWidth = 1.0;        // Default world width
+    double worldHeight = 1.0;       // Default world height
+    double stepSize = 0.1;          // Default step size
     
     // Parse command line arguments
     for (int i = 1; i < argc; i++) {
@@ -111,6 +114,12 @@ int main(int argc, char* argv[]) {
             maxIterations = std::stoi(argv[++i]);
         } else if (arg == "--threads" && i + 1 < argc) {
             numThreads = std::stoi(argv[++i]);
+        } else if (arg == "--width" && i + 1 < argc) {
+            worldWidth = std::stod(argv[++i]);
+        } else if (arg == "--height" && i + 1 < argc) {
+            worldHeight = std::stod(argv[++i]);
+        } else if (arg == "--step" && i + 1 < argc) {
+            stepSize = std::stod(argv[++i]);
         } else if (arg == "--standard") {
             runStandard = true;
             runAll = false;
@@ -130,6 +139,9 @@ int main(int argc, char* argv[]) {
                       << "  --no-vis          Disable visualization\n"
                       << "  --iter <num>      Set maximum iterations (default: 5000)\n"
                       << "  --threads <num>   Set number of CUDA threads (default: 256)\n"
+                      << "  --width <num>     Set world width (default: 1.0)\n"
+                      << "  --height <num>    Set world height (default: 1.0)\n"
+                      << "  --step <num>      Set step size (default: 0.1)\n"
                       << "  --standard        Run only standard RRT\n"
                       << "  --star            Run only RRT*\n"
                       << "  --bi              Run only Bidirectional RRT\n"
@@ -140,15 +152,13 @@ int main(int argc, char* argv[]) {
     }
     
     // Example usage - create start and goal nodes
-    Node start(0.1, 0.1);
-    Node goal(0.9, 0.9);
+    Node start(0.1 * worldWidth, 0.1 * worldHeight);
+    Node goal(0.9 * worldWidth, 0.9 * worldHeight);
     
     // Define obstacles
     std::vector<Obstacle> obstacles;
     
     // Create two rectangular obstacles
-    double worldWidth = 1.0;
-    double worldHeight = 1.0;
     double obstacleWidth = worldWidth / 10.0;
     
     // First obstacle at 1/3 of the world width
@@ -163,6 +173,7 @@ int main(int argc, char* argv[]) {
     
     // Print configuration
     std::cout << "CUDA RRT Implementations Benchmark" << std::endl;
+    std::cout << "World dimensions: " << worldWidth << " x " << worldHeight << std::endl;
     std::cout << "Start: (" << start.x << ", " << start.y << ")" << std::endl;
     std::cout << "Goal: (" << goal.x << ", " << goal.y << ")" << std::endl;
     std::cout << "Obstacles: " << obstacles.size() << std::endl;
@@ -173,13 +184,13 @@ int main(int argc, char* argv[]) {
     std::cout << "Configuration:" << std::endl
               << "  Max iterations: " << maxIterations << std::endl
               << "  CUDA threads: " << numThreads << std::endl
+              << "  Step size: " << stepSize << std::endl
               << "  Visualization: " << (enableVisualization ? "enabled" : "disabled") << std::endl;
     
     // Algorithm parameters
-    double stepSize = 0.1;
     double goalThreshold = 0.1;
-    double rewireRadius = 0.2;  // Radius for RRT* rewiring
-    double connectThreshold = 0.15; // For bidirectional RRT
+    double rewireRadius = 0.2 * worldWidth;  // Radius for RRT* rewiring
+    double connectThreshold = 0.15 * worldWidth; // For bidirectional RRT
     
     // Run standard RRT
     if (runAll || runStandard) {
@@ -187,7 +198,7 @@ int main(int argc, char* argv[]) {
         runBenchmark("Standard RRT CUDA", [&]() {
             return buildRRTCuda(
                 start, goal, obstacles, stepSize, goalThreshold, maxIterations,
-                0.0, 1.0, 0.0, 1.0, "rrt_standard_cuda_tree.csv", enableVisualization, numThreads
+                0.0, worldWidth, 0.0, worldHeight, "rrt_standard_cuda_tree.csv", enableVisualization, numThreads
             );
         });
     }
@@ -198,7 +209,7 @@ int main(int argc, char* argv[]) {
         runBenchmark("RRT* CUDA", [&]() {
             return buildRRTStarCuda(
                 start, goal, obstacles, stepSize, goalThreshold, maxIterations, rewireRadius,
-                0.0, 1.0, 0.0, 1.0, "rrt_star_cuda_tree.csv", enableVisualization, numThreads
+                0.0, worldWidth, 0.0, worldHeight, "rrt_star_cuda_tree.csv", enableVisualization, numThreads
             );
         });
     }
@@ -209,7 +220,7 @@ int main(int argc, char* argv[]) {
         runBenchmark("Bidirectional RRT CUDA", [&]() {
             return buildRRTBidirectionalCuda(
                 start, goal, obstacles, stepSize, connectThreshold, maxIterations,
-                0.0, 1.0, 0.0, 1.0, "rrt_bi_cuda_tree.csv", enableVisualization, numThreads
+                0.0, worldWidth, 0.0, worldHeight, "rrt_bi_cuda_tree.csv", enableVisualization, numThreads
             );
         });
     }
@@ -220,7 +231,7 @@ int main(int argc, char* argv[]) {
         runBenchmark("Informed RRT* CUDA", [&]() {
             return buildRRTInformedCuda(
                 start, goal, obstacles, stepSize, goalThreshold, maxIterations, rewireRadius,
-                0.0, 1.0, 0.0, 1.0, "rrt_informed_cuda_tree.csv", enableVisualization, numThreads, false
+                0.0, worldWidth, 0.0, worldHeight, "rrt_informed_cuda_tree.csv", enableVisualization, numThreads, false
             );
         });
     }
