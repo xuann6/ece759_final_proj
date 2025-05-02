@@ -8,8 +8,8 @@
 int main()
 {
     // World size configuration
-    double worldWidth = 100.0;
-    double worldHeight = 100.0;
+    double worldWidth = 1.0;
+    double worldHeight = 1.0;
     double xMin = 0.0, xMax = worldWidth, yMin = 0.0, yMax = worldHeight;
     
     // Configuration

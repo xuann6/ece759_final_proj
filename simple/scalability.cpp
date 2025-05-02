@@ -281,12 +281,12 @@ int main() {
         std::cout << "========================================" << std::endl;
         
         // Benchmark RRT
-        auto rrtFunc = [&](int iterations, bool vis) {
-            return buildRRT(start, goal, stepSize, goalThreshold, iterations, 
-                            xMin, xMax, yMin, yMax, 
-                            "rrt_tree_" + std::to_string(iterations) + ".csv", vis);
-        };
-        rrtResults.push_back(runBenchmark(rrtFunc, maxIter, enableVisualization, "RRT"));
+        // auto rrtFunc = [&](int iterations, bool vis) {
+        //     return buildRRT(start, goal, stepSize, goalThreshold, iterations, 
+        //                     xMin, xMax, yMin, yMax, 
+        //                     "rrt_tree_" + std::to_string(iterations) + ".csv", vis);
+        // };
+        // rrtResults.push_back(runBenchmark(rrtFunc, maxIter, enableVisualization, "RRT"));
         
         // Benchmark RRT*
         auto rrtStarFunc = [&](int iterations, bool vis) {

@@ -6,40 +6,68 @@ import matplotlib.animation as animation
 from matplotlib.patches import Circle
 
 
-def save_frames_as_gif(ani, filename='rrt_animation', frames=100):
-    """Save animation frames as a GIF using imageio"""
-    import imageio.v2 as imageio
-    import os
+def save_frames_as_gif(ani, filename='rrt_animation', fps=20):
+    """Save animation as a GIF file using Pillow Writer"""
+    try:
+        # Try using PillowWriter which is more reliable
+        from matplotlib.animation import PillowWriter
+        
+        print(f"Creating GIF with {fps} fps...")
+        writer = PillowWriter(fps=fps)
+        ani.save(f"{filename}.gif", writer=writer)
+        print(f"Animation saved to {filename}.gif")
+        
+        return f"{filename}.gif"
     
-    frames_dir = "temp_frames"
-    os.makedirs(frames_dir, exist_ok=True)
-    
-    print(f"Generating {frames} frames...")
-    # Save each frame as an image
-    for i in range(frames):
-        ani._draw_frame(i)
-        plt.savefig(f"{frames_dir}/frame_{i:03d}.png")
-        if i % 10 == 0:
-            print(f"Generated frame {i}/{frames}")
-    
-    # Collect all frames
-    images = []
-    for i in range(frames):
-        images.append(imageio.imread(f"{frames_dir}/frame_{i:03d}.png"))
-    
-    # Save as GIF
-    print("Creating GIF...")
-    imageio.mimsave(f'{filename}.gif', images, duration=0.05)
-    print(f"Animation saved to {filename}.gif")
-    
-    # Clean up frames
-    for i in range(frames):
-        os.remove(f"{frames_dir}/frame_{i:03d}.png")
-    os.rmdir(frames_dir)
-    
-    return f'{filename}.gif'
+    except Exception as e:
+        print(f"Error saving animation with PillowWriter: {e}")
+        
+        # Fallback to manual frame saving if PillowWriter fails
+        import imageio.v2 as imageio
+        import os
+        import matplotlib.pyplot as plt
+        
+        frames_dir = "temp_frames"
+        os.makedirs(frames_dir, exist_ok=True)
+        
+        frames = ani._init_draw().frames
+        print(f"Saving {frames} frames manually...")
+        
+        # Save each frame as an image
+        for i in range(frames):
+            # Create a new figure for each frame to avoid issues
+            fig = plt.figure(figsize=(15, 7))
+            ani._draw_frame(i)
+            plt.savefig(f"{frames_dir}/frame_{i:03d}.png")
+            plt.close(fig)
+            
+            if i % 10 == 0:
+                print(f"Generated frame {i}/{frames}")
+        
+        # Collect all frames
+        images = []
+        for i in range(frames):
+            try:
+                images.append(imageio.imread(f"{frames_dir}/frame_{i:03d}.png"))
+            except:
+                print(f"Warning: Could not read frame {i}")
+        
+        # Save as GIF
+        print("Creating GIF...")
+        imageio.mimsave(f'{filename}.gif', images, duration=1/fps)
+        print(f"Animation saved to {filename}.gif")
+        
+        # Clean up frames
+        try:
+            for i in range(frames):
+                os.remove(f"{frames_dir}/frame_{i:03d}.png")
+            os.rmdir(frames_dir)
+        except:
+            print(f"Warning: Could not clean up temporary frame directory")
+        
+        return f'{filename}.gif'
 
-def visualize_rrt(tree_file="rrt_star_tree.csv"):
+def visualize_rrt(tree_file="rrt_informed_tree.csv"):
     # Load the RRT tree data
     try:
         df = pd.read_csv(tree_file)
