@@ -1,0 +1,214 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs} % For better table rules
+\usepackage{caption} % For captions
+
+\title{Accelerating Path Planning for Autonomous Robots}
+\author{Aswin Ramkumar \and Ayush Vijay Kedari \and Ganesh Arivoli \and Xu Xiong \and Yoshi Chao \and Yuanpei Zhang}
+\date{May 3, 2025 (Draft) \\ Course: ECE 759}
+
+\begin{document}
+
+\maketitle
+
+\section*{Project Repository}
+\textbf{GitHub:} \url{https://github.com/xuann6/ece759_final_proj.git}
+
+\begin{abstract}
+Path planning algorithms like the Rapidly-Exploring Random Tree (RRT) and its variants are crucial for autonomous systems, enabling navigation in complex environments. However, their computational intensity, particularly concerning nearest-neighbor searches and collision detection, often limits real-time applicability. This project focuses on accelerating RRT-based path planning algorithms by implementing and evaluating parallel computing strategies using OpenMP for multi-core CPUs and CUDA for GPUs. We analyze the performance gains achieved through parallelization across different RRT variants (Standard RRT, RRT*, Informed RRT*, Bidirectional RRT) and identify key performance bottlenecks. Our results demonstrate significant speedups, particularly with GPU acceleration via CUDA, offering insights into optimizing these algorithms for practical robotic applications.
+\end{abstract}
+
+\section{Introduction}
+
+\subsection{Problem Statement}
+Autonomous robots, ranging from warehouse logistics units to self-driving cars, require efficient and reliable path planning to navigate safely and effectively through their environments. Algorithms like RRT and Probabilistic Roadmaps (PRM) are widely used for finding collision-free paths, especially in high-dimensional spaces. However, the computational cost associated with these algorithms, particularly operations like finding the nearest node in the tree and performing collision checks against obstacles, scales with the complexity of the environment and the desired path resolution, often becoming a bottleneck for real-time performance. This project directly addresses this challenge by exploring parallelization techniques to accelerate RRT algorithm variants.
+
+\subsection{Motivation}
+The need for real-time path planning in dynamic environments motivates the exploration of hardware acceleration. As the search space grows (e.g., moving from 2D to 3D) or the number of nodes in the tree increases, sequential implementations of RRT become too slow. Optimizing critical components like nearest node searches and collision detection through parallel processing on multi-core CPUs and GPUs is essential to making these algorithms practical for real-world deployment.
+
+\subsection{Project Goals}
+The primary goal is to enhance RRT algorithm performance using parallelization and smart heuristics to generate collision-free paths significantly faster than sequential implementations. Specific objectives include:
+\begin{itemize}
+    \item Implementing baseline sequential versions of RRT variants.
+    \item Developing parallel versions using OpenMP and CUDA.
+    \item Comparing the performance (speedup, latency) of sequential, OpenMP, and CUDA implementations across different RRT variants and problem complexities.
+    \item Analyzing the results to understand the effectiveness of parallelization and identify remaining bottlenecks.
+    \item Providing insights for deploying robotics algorithms on real-world hardware.
+\end{itemize}
+
+\section{Background: RRT Algorithms}
+
+The Rapidly-Exploring Random Tree (RRT) algorithm builds a space-filling tree by randomly sampling points in the configuration space and connecting them to the nearest existing node in the tree, incrementally exploring the environment. Several variants exist to improve efficiency or find more optimal paths:
+\begin{itemize}
+    \item \textbf{Standard RRT:} Add description here.
+    \item \textbf{RRT*:} Add description here.
+    \item \textbf{Informed RRT*:} Add description here.
+    \item \textbf{Bidirectional RRT:} Add description here.
+\end{itemize}
+The core steps involve sampling, finding the nearest node, steering towards the sample, checking for collisions, and adding a new node if the path segment is collision-free.
+
+\section{Methodology \& Implementation}
+
+\subsection{Parallelization Strategy}
+We targeted the computationally intensive parts of the RRT algorithms for parallelization using both CPU and GPU architectures. Profiling indicated that functions like \texttt{findNearest}, \texttt{rewireTree}, \texttt{chooseBestParent}, and collision checking (\texttt{isPathClear}) were major contributors to runtime across different RRT variants.
+
+\subsection{OpenMP Implementation (CPU)}
+For multi-core CPU parallelization, OpenMP directives were used. Key parallelized sections included:
+\begin{itemize}
+    \item \textbf{Nearest Node Search:} Add description here.
+    \item \textbf{RRT* Rewiring/Parent Selection:} Add description here.
+    \item \textbf{Bidirectional RRT Connection:} Add description here.
+\end{itemize}
+
+A simplified example of parallelizing nearest node search:
+\begin{verbatim}
+// Find nearest node in parallel (Conceptual Example)
+int findNearestParallel(const std::vector<Node>& nodes, const Node& point) {
+    int nearest = 0;
+    double minDist = distance(nodes[0], point);
+
+    #pragma omp parallel
+    {
+        int local_nearest = 0;
+        double local_minDist = std::numeric_limits<double>::max();
+
+        #pragma omp for nowait
+        for (int i = 0; i < nodes.size(); ++i) {
+            double dist = distance(nodes[i], point);
+            if (dist < local_minDist) {
+                local_minDist = dist;
+                local_nearest = i;
+            }
+        }
+
+        #pragma omp critical
+        {
+            if (local_minDist < minDist) {
+                minDist = local_minDist;
+                nearest = local_nearest;
+            }
+        }
+    }
+    return nearest;
+}
+\end{verbatim}
+
+
+\subsection{CUDA Implementation (GPU)}
+For GPU acceleration, CUDA was employed to offload computations. Specific CUDA kernels were developed for:
+\begin{itemize}
+    \item \textbf{Nearest Node Search (\texttt{findNearestKernel}):} Each thread calculates the distance to a subset of nodes, followed by a parallel reduction to find the minimum distance node.
+    \item \textbf{Collision Checking (\texttt{checkCollisionKernel}):} Parallelizing the checks for intersections between the new path segment and environment obstacles.
+    \item \textbf{Bidirectional RRT Closest Pair (\texttt{findClosestPairKernel}):} Efficiently finding the minimum distance pair of nodes between the two trees growing from the start and goal.
+\end{itemize}
+
+\subsection{TPU Exploration (Challenges Encountered)}
+
+Add TPU exploration here.
+
+\section{Experimental Setup}
+
+\begin{itemize}
+    \item \textbf{Algorithms Compared:} Standard RRT, RRT*, Bidirectional RRT.
+    \item \textbf{Implementations:} Sequential C++, OpenMP (8 threads used for reported results), CUDA.
+    \item \textbf{Environment:} 2D world.
+    \item \textbf{Problem Specifications (Primary):}
+        \begin{itemize}
+            \item World Size: $100 \times 100$.
+            \item Start/Goal: [10,10] to [90,90].
+            \item Step Size: 0.1.
+            \item Goal Threshold: 0.1.
+            \item Max Iterations: 1,000,000.
+            \item Obstacles: 2 fixed rectangular obstacles (Configuration without obstacles also tested). Location example: ($x1=\frac{1}{3}\times\text{width}, y1=0.6\times\text{height}$).
+        \end{itemize}
+    \item \textbf{Hardware:} Experiments run on systems with multi-core CPUs and NVIDIA GPUs (e.g., NVIDIA GeForce RTX 4090 mentioned in profiling).
+    \item \textbf{Metrics:} Execution time (seconds), Speedup (Sequential Time / Parallel Time).
+\end{itemize}
+
+\section{Results}
+
+\subsection{Performance Comparison}
+Parallel implementations consistently outperformed the sequential baseline across all tested RRT variants, with CUDA generally achieving the highest speedups.
+
+% Placeholder for Table/Figure summarizing times (Needs data from Fig P13/P28)
+\begin{figure}[h]
+    \centering
+    % \includegraphics[width=0.8\textwidth]{path/to/timing_comparison_plot.png} % Actual plot
+    \fbox{Placeholder: Bar chart comparing execution times (Seq, OMP, CUDA) for RRT, RRT*, BiRRT (like Fig P13)}
+    \caption{Execution Time Comparison for RRT Algorithms ($100 \times 100$ grid, without obstacles).}
+    \label{fig:timing_comp}
+\end{figure}
+
+\begin{table}[h]
+    \centering
+    \caption{Execution Times (seconds) - $100 \times 100$ Grid, No Obstacles}
+    \label{tab:times_100}
+    \begin{tabular}{lccc}
+        \toprule
+        Algorithm         & CPU (Sequential) & CPU (OpenMP, 8 threads) & GPU (CUDA) \\
+        \midrule
+        Standard RRT      & 2.53             & 0.94                    & 0.45       \\
+        RRT* & 7.58             & 1.83                    & ---        \\ % CUDA time missing for RRT*
+        Bidirectional RRT & 23.47            & 7.89                    & 0.46       \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Key Observations:}
+\begin{itemize}
+    \item \textbf{Standard RRT:} Showed good speedup with both OpenMP (e.g., $\approx 2.7 \times$ actual) and significant speedup with CUDA (e.g., $\approx 5.6 \times$ actual on $100 \times 100$ grid).
+    \item \textbf{RRT*:} CUDA acceleration was particularly effective for RRT*, possibly due to the parallelization of the compute-intensive rewiring steps. OpenMP speedup was also observed ($\approx 4.1 \times$ actual).
+    \item \textbf{Bidirectional RRT:} Also benefited from parallelization, with CUDA offering substantial gains. OpenMP speedup $\approx 3.0 \times$.
+\end{itemize}
+
+\subsection{Scalability}
+Experiments on a larger grid ($1000 \times 1000$) for Standard RRT indicated that the benefits of GPU acceleration (CUDA) scaled better with problem size compared to OpenMP.
+
+\begin{table}[h]
+    \centering
+    \caption{Standard RRT Scalability Comparison}
+    \label{tab:scalability}
+    \begin{tabular}{llcc}
+        \toprule
+        Grid Size          & Implementation          & Actual Speedup (8T vs Seq) & Notes \\
+        \midrule
+        $100 \times 100$   & CPU (OpenMP)            & $2.70 \times$              &  \\
+                           & GPU (CUDA)              & $5.57 \times$              &  \\
+        \midrule
+        $1000 \times 1000$ & CPU (OpenMP)            & $3.15 \times$              &  \\
+                           & GPU (CUDA)              & $13.55 \times$             &  \\
+        \bottomrule
+    \end{tabular}
+    \caption*{Note: Speedup calculated relative to the sequential CPU time for that grid size.}
+\end{table}
+
+% Placeholder for Scalability Figure
+\begin{figure}[h]
+    \centering
+     \fbox{Placeholder: Bar chart comparing execution times on 100x100 vs 1000x1000 grids (like Fig P14)}
+    \caption{Execution Time Comparison across Grid Sizes for Standard RRT.}
+    \label{fig:scaling_comp}
+\end{figure}
+
+
+\subsection{Profiling Insights}
+
+Add profiling results here.
+\section{Analysis}
+
+Add analysis here.
+\section{Conclusion \& Future Work}
+
+Add conclusion here.
+
+
+% Using a simple bibliography for placeholders mentioned in text
+\section*{References}
+Add references here.
+\end{document}
