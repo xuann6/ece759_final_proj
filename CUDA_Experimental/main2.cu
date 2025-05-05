@@ -19,22 +19,22 @@
 }
 
 // --- Parameters ---
-// World parameters
-#define WORLD_WIDTH 100.0f
-#define WORLD_HEIGHT 100.0f
-#define STEP_SIZE 0.1f
-#define START_X 10.0f
-#define START_Y 10.0f
-#define GOAL_X 90.0f
-#define GOAL_Y 90.0f
-#define GOAL_THRESHOLD 0.1f
+// World parameters - UW Madison Campus (Engineering Hall to Chocolate Shoppe)
+#define WORLD_WIDTH 2800.2f
+#define WORLD_HEIGHT 1544.7f
+#define STEP_SIZE 10.0f
+#define START_X 822.8f  // Engineering Hall
+#define START_Y 781.8f
+#define GOAL_X 2216.8f   // Chocolate Shoppe
+#define GOAL_Y 1070.3f
+#define GOAL_THRESHOLD 15.0f
 #define GOAL_THRESHOLD_SQ (GOAL_THRESHOLD * GOAL_THRESHOLD) // Use squared distance
 
 // RRT parameters
 #define GOAL_BIAS 0.1f
-#define MAX_ITERATIONS 10000 // Maximum kernel launches
-#define NUM_BLOCKS 1
-#define MAX_NODES 10000000    // Maximum nodes in the tree (adjust based on expected size & GPU memory)
+#define MAX_ITERATIONS 20000 // Maximum kernel launches
+#define NUM_BLOCKS 4
+#define MAX_NODES 2000000    // Maximum nodes in the tree (adjust based on expected size & GPU memory)
 
 // Obstacle parameters (Using defines directly for simplicity in kernel)
 #define OBSTACLE_WIDTH (WORLD_WIDTH / 10.0f)
@@ -46,7 +46,7 @@
 #define OBSTACLE2_Y (WORLD_HEIGHT - OBSTACLE2_HEIGHT) // Obstacle 2 starts from the top
 
 // CUDA execution parameters
-#define THREADS_PER_BLOCK 16
+#define THREADS_PER_BLOCK 128
 // Calculate grid size based on desired parallelism (e.g., try to run thousands of threads)
 // #define NUM_BLOCKS ( (MAX_NODES + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK ) // Can be adjusted
 
@@ -252,12 +252,48 @@ __global__ void rrt_iteration_kernel(Node* d_nodes,
 
 // --- Host Code ---
 int main() {
-    // --- Setup Obstacles ---
+    // --- Setup Obstacles from CSV file ---
     std::vector<Obstacle> h_obstacles;
-    // Obstacle 1
-    h_obstacles.push_back({OBSTACLE1_X, OBSTACLE1_Y, OBSTACLE1_X + OBSTACLE_WIDTH, OBSTACLE1_Y + OBSTACLE1_HEIGHT});
-    // Obstacle 2
-    h_obstacles.push_back({OBSTACLE2_X, OBSTACLE2_Y, OBSTACLE2_X + OBSTACLE_WIDTH, OBSTACLE2_Y + OBSTACLE2_HEIGHT});
+    
+    // Read obstacle data from CSV file
+    FILE* building_file = fopen("building_obstacles.csv", "r");
+    if (building_file == NULL) {
+        fprintf(stderr, "Error: Cannot open building obstacles file. Using default obstacles.\n");
+        // Add a few default obstacles if file can't be opened
+        h_obstacles.push_back({WORLD_WIDTH / 3, WORLD_HEIGHT / 4, WORLD_WIDTH / 3 + 100, WORLD_HEIGHT / 4 + 200});
+        h_obstacles.push_back({WORLD_WIDTH * 2/3, WORLD_HEIGHT * 2/3, WORLD_WIDTH * 2/3 + 150, WORLD_HEIGHT * 2/3 + 150});
+    } else {
+        // Skip header line
+        char line[256];
+        fgets(line, sizeof(line), building_file);
+        
+        // Read building data
+        printf("Loading building obstacles from CSV file...\n");
+        char name[64];
+        float x_min, y_min, x_max, y_max;
+        int buildings_loaded = 0;
+        
+        while (fscanf(building_file, "%63[^,],%f,%f,%f,%f\n", 
+                      name, &x_min, &y_min, &x_max, &y_max) == 5) {
+            // Add building as obstacle
+            h_obstacles.push_back({x_min, y_min, x_max, y_max});
+            buildings_loaded++;
+            
+            // Print first 5 buildings and then summarize
+            if (buildings_loaded <= 5) {
+                printf("  Building: %s at (%.1f,%.1f) to (%.1f,%.1f)\n", 
+                       name, x_min, y_min, x_max, y_max);
+            }
+        }
+        
+        if (buildings_loaded > 5) {
+            printf("  ... and %d more buildings\n", buildings_loaded - 5);
+        }
+        
+        fclose(building_file);
+        printf("Loaded %d buildings as obstacles\n", buildings_loaded);
+    }
+    
     int num_obstacles = h_obstacles.size();
 
     printf("World: %.1fx%.1f, Start: (%.1f, %.1f), Goal: (%.1f, %.1f)\n",
