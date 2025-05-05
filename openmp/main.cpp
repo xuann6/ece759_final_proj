@@ -21,8 +21,8 @@ int main()
     Node goal(90, 90);
 
     double xMin = 0;
-    double xMax = 0;
-    double yMin = 100;
+    double xMax = 100;
+    double yMin = 0;
     double yMax = 100;
 
     double pathLengthRRT = 0.0;
@@ -105,7 +105,7 @@ int main()
     // auto startTimeRRTStar = std::chrono::high_resolution_clock::now();
 
     // // Dummy obstacles (empty vector for simplicity)
-    // std::vector<std::vector<double>> obstacles;
+    std::vector<std::vector<double>> obstacles;
 
     // // Run RRT*
     // std::vector<Node> pathRRTStar = rrt_star::buildRRTStar(
@@ -169,7 +169,7 @@ int main()
 
     // Run OpenMP RRT*
     std::vector<Node> pathRRTBiOmp = bidirectional_rrt_omp::buildBidirectionalRRT(
-        start, goal, obstacles, 0.1, 0.1, 5000, xMin, xMax, yMin, yMax, "rrt_bi_omp_tree.csv", enableVisualization, numThreads);
+        start, goal, obstacles, 0.1, 0.1, iterations, xMin, xMax, yMin, yMax, "rrt_bi_omp_tree.csv", enableVisualization, numThreads);
 
     // End timer
     auto endTimeRRTBiOmp = std::chrono::high_resolution_clock::now();
